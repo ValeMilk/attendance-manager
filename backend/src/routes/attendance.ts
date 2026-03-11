@@ -4,6 +4,7 @@ import { AttendanceRecord } from '../models/AttendanceRecord.js';
 import { Justification } from '../models/Justification.js';
 import { User } from '../models/User.js';
 import { Employee } from '../models/Employee.js';
+import { Types } from 'mongoose';
 
 // simple slug helper
 function slugify(s: string) {
@@ -33,6 +34,11 @@ const router = Router();
 // Upsert multiple attendance records
 router.post('/', authenticateJWT, async (req: AuthRequest, res) => {
   try {
+    const role = req.user?.role;
+    if (role === 'expectador') {
+      return res.status(403).json({ message: 'Insufficient permissions' });
+    }
+
     const records: any[] = req.body.records || [];
     if (!Array.isArray(records)) return res.status(400).json({ message: 'Invalid payload' });
 
@@ -86,12 +92,20 @@ router.post('/', authenticateJWT, async (req: AuthRequest, res) => {
     await AttendanceRecord.bulkWrite(
       ops.map((r) => ({
         updateOne: {
-          filter: { employeeId: r.canonicalId, day: r.day },
+          filter: {
+            employeeId: r.canonicalId,
+            day: r.day,
+            $or: [
+              { supervisorId: r.supervisorId },
+              { supervisorId: { $exists: false } },
+              { supervisorId: '' },
+            ],
+          },
           update: {
             $set: {
               apontador: r.apontador,
               supervisor: r.supervisor,
-              createdBy: r.createdBy,
+              createdBy: r.createdBy ? new Types.ObjectId(String(r.createdBy)) : null,
               supervisorId: r.supervisorId,
               employeeName: r.employeeName,
             },
@@ -164,6 +178,11 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
 // Justifications endpoints
 router.post('/justifications', authenticateJWT, async (req: AuthRequest, res) => {
   try {
+    const role = req.user?.role;
+    if (role === 'expectador') {
+      return res.status(403).json({ message: 'Insufficient permissions' });
+    }
+
     const { justifications } = req.body;
     if (!Array.isArray(justifications)) return res.status(400).json({ message: 'Invalid payload' });
     for (const j of justifications) {
@@ -213,6 +232,24 @@ router.delete('/justifications', authenticateJWT, async (req: AuthRequest, res) 
     const role = req.user?.role;
     if (role === 'expectador') {
       return res.status(403).json({ message: 'Insufficient permissions' });
+    }
+
+    let target: any = null;
+    if (id) {
+      target = await Justification.findById(String(id)).lean();
+      if (!target) return res.json({ ok: true, deleted: false });
+    } else {
+      target = await Justification.findOne({ employeeId: String(employeeId), day: String(day) }).lean();
+      if (!target) return res.json({ ok: true, deleted: false });
+    }
+
+    if (role === 'supervisor') {
+      const user = await User.findById(req.userId).select('supervisorId').lean();
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      const supPrefix = String((user as any).supervisorId || '');
+      if (!supPrefix || !String(target.employeeId || '').startsWith(supPrefix)) {
+        return res.status(403).json({ message: 'Insufficient permissions' });
+      }
     }
 
     const deleted = id
