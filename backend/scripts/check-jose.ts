@@ -1,0 +1,30 @@
+import mongoose from "mongoose";
+import { readFileSync } from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const envFile = readFileSync(path.join(__dirname, "../.env"), "utf8");
+const dbUrl = envFile.split("\n").find(l => l.startsWith("MONGODB_URI"))?.split("=").slice(1).join("=")?.trim().replace(/['"]/g, "");
+
+await mongoose.connect(dbUrl!);
+
+const UserSchema = new mongoose.Schema({}, { strict: false });
+const User = mongoose.models.User || mongoose.model("User", UserSchema, "users");
+
+const jose = await User.findOne({ email: "jose-furtado@attendance.com" }).lean() as any;
+console.log("Jose Furtado:");
+console.log("  _id:", jose?._id?.toString());
+console.log("  email:", jose?.email);
+console.log("  role:", jose?.role);
+console.log("  supervisorId:", jose?.supervisorId);
+console.log("  employees count:", jose?.employees?.length);
+console.log("  first 3 employees:", JSON.stringify(jose?.employees?.slice(0, 3)));
+
+// Também verificar rodney para comparação
+const rodney = await User.findOne({ email: "rodney-de-macedo@attendance.com" }).lean() as any;
+console.log("\nRodney:");
+console.log("  supervisorId:", rodney?.supervisorId);
+console.log("  employees (first 3):", JSON.stringify(rodney?.employees?.slice(0, 3)));
+
+await mongoose.disconnect();

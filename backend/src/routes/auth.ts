@@ -8,6 +8,39 @@ import { Response } from 'express';
 
 const router = Router();
 
+const LOGIN_ALIAS_EMAIL: Record<string, string> = {
+  admin: 'admin@attendance.com',
+  mariana: 'mariana-moura@attendance.com',
+  jose: 'jose-furtado@attendance.com',
+  josefurtado: 'jose-furtado@attendance.com',
+  paulo: 'paulo-oliveira@attendance.com',
+  paulinho: 'paulinho-de-paula@attendance.com',
+  rodney: 'rodney-de-macedo@attendance.com',
+  expectador: 'expectador@attendance.com',
+};
+
+function buildLoginCandidates(identifier: string): string[] {
+  const raw = (identifier || '').trim().toLowerCase();
+  if (!raw) {
+    return [];
+  }
+
+  const candidates = new Set<string>();
+  candidates.add(raw);
+
+  const localPart = raw.includes('@') ? raw.split('@')[0] : raw;
+  const canonical = LOGIN_ALIAS_EMAIL[localPart];
+  if (canonical) {
+    candidates.add(canonical);
+  }
+
+  if (!raw.includes('@')) {
+    candidates.add(`${raw}@attendance.com`);
+  }
+
+  return [...candidates];
+}
+
 // Register
 router.post('/register', async (req: AuthRequest, res: Response) => {
   try {
@@ -48,12 +81,16 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
 router.post('/login', async (req: AuthRequest, res: Response) => {
   try {
     const { email, password } = req.body;
-    console.log('[AUTH] Login attempt for', email);
-    console.log('[AUTH] Request body:', req.body);
+    const loginCandidates = buildLoginCandidates(email);
+    const users = await User.find({ email: { $in: loginCandidates } });
+    const user = users.find((item) => item.isActive !== false) || users[0] || null;
 
-    const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    if (user.isActive === false) {
+      return res.status(403).json({ message: 'User is inactive. Use your canonical account.' });
     }
 
     const isMatch = await bcryptjs.compare(password, user.password);

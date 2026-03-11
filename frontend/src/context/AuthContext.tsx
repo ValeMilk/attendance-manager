@@ -71,7 +71,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    if (!res.ok) throw new Error('Login failed');
+    if (!res.ok) {
+      let message = 'Login failed';
+      try {
+        const err = await res.json();
+        if (err?.message) message = err.message;
+      } catch {}
+      throw new Error(message);
+    }
     const body = await res.json();
     setAccessToken(body.accessToken);
     setUser(body.user);

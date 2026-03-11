@@ -17,6 +17,7 @@ interface HeaderControlsProps {
   currentUserRole: 'admin' | 'supervisor' | 'expectador';
   onRoleChange: (role: 'admin' | 'supervisor' | 'expectador') => void;
   onClearAll: () => void;
+  onRefresh?: () => void;
 }
 
 export function HeaderControls({
@@ -28,11 +29,13 @@ export function HeaderControls({
   currentUserRole,
   onRoleChange,
   onClearAll,
+  onRefresh,
 }: HeaderControlsProps) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const monthLabel = format(currentDate, 'MMMM yyyy', { locale: ptBR }).toUpperCase();
   const [showPeriodSidebar, setShowPeriodSidebar] = useState(false);
+  const isRoleLocked = !!user;
 
   function getPeriodRange(date: Date) {
     // período de 26 deste mês até 25 do próximo mês
@@ -59,6 +62,7 @@ export function HeaderControls({
               variant={currentUserRole === 'admin' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => onRoleChange('admin')}
+              disabled={isRoleLocked && user?.role !== 'admin'}
               className="gap-2"
             >
               <Shield className="w-4 h-4" />
@@ -68,6 +72,7 @@ export function HeaderControls({
               variant={currentUserRole === 'supervisor' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => onRoleChange('supervisor')}
+              disabled={isRoleLocked && user?.role !== 'supervisor'}
               className="gap-2"
             >
               <Users className="w-4 h-4" />
@@ -77,6 +82,7 @@ export function HeaderControls({
               variant={currentUserRole === 'expectador' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => onRoleChange('expectador')}
+              disabled={isRoleLocked && user?.role !== 'expectador'}
               className="gap-2"
             >
               <Users className="w-4 h-4" />
@@ -135,6 +141,15 @@ export function HeaderControls({
 
         {/* ações de limpar e avançar foram removidas — navegue com as setas */}
         <div className="flex items-center gap-2">
+          {onRefresh && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+            >
+              Atualizar
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

@@ -30,6 +30,7 @@ const Index = () => {
     removeJustification,
     getTotals,
     saveAll,
+    refreshData,
   } = useAttendance();
 
   // sync auth user role into attendance hook
@@ -37,7 +38,9 @@ const Index = () => {
     const { user } = useAuth();
     useEffect(() => {
       if (user) {
-        setCurrentUserRole(user.role as 'admin' | 'supervisor' | 'expectador');
+        if (currentUserRole !== user.role) {
+          setCurrentUserRole(user.role as 'admin' | 'supervisor' | 'expectador');
+        }
         if (user.role === 'supervisor') {
           // auto-select the supervisor id associated with the logged user so the UI
           // filters employees and shows the correct view for that supervisor
@@ -48,7 +51,7 @@ const Index = () => {
         // no user -> default admin (or guest)
         setCurrentUserRole('expectador');
       }
-    }, [user]);
+    }, [user, currentUserRole]);
     return null;
   };
 
@@ -97,6 +100,7 @@ const Index = () => {
           currentUserRole={currentUserRole}
           onRoleChange={setCurrentUserRole}
           onClearAll={clearAll}
+          onRefresh={refreshData}
         />
 
         <AttendanceTable
@@ -123,7 +127,7 @@ const Index = () => {
           currentUserRole={currentUserRole}
         />
 
-        {currentUserRole !== 'expectador' && (
+        {currentUserRole === 'admin' && (
           <DataExport
             employees={filteredEmployees}
             daysInMonth={daysInMonth}

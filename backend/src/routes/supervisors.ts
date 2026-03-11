@@ -4,23 +4,36 @@ import { authenticateJWT, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
+const hasAnyTeam = (user: any) => {
+  const employees = Array.isArray(user?.employees) ? user.employees : [];
+  return employees.length > 0;
+};
+
+const isEmployeeTeam = (user: any) => {
+  const employees = Array.isArray(user?.employees) ? user.employees : [];
+  if (employees.length === 0) return false;
+  return employees.some((e: any) => String(e?.role || '').toLowerCase() !== 'supervisor');
+};
+
 // Authenticated endpoint to list supervisors filtered by requester role
 router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
   try {
     const role = req.user?.role;
 
-    // Admin (apontador) sees all supervisors and admin environments
+    // Admin (apontador) sees all supervisor environments (including managers like Rodney)
     if (role === 'admin') {
-      const all = await User.find({ role: { $in: ['supervisor', 'admin'] } })
+      const all = await User.find({ role: 'supervisor', isActive: true })
         .select('name supervisorId employees role')
         .lean();
-      return res.json(all.map((s: any) => ({ _id: s._id, name: s.name, supervisorId: s.supervisorId, employees: s.employees, role: s.role })));
+      const filtered = all.filter(hasAnyTeam);
+      return res.json(filtered.map((s: any) => ({ _id: s._id, name: s.name, supervisorId: s.supervisorId, employees: s.employees, role: s.role })));
     }
 
-    // Expectador sees all supervisors but not admin's environment
+    // Expectador sees all supervisors with any team
     if (role === 'expectador') {
-      const list = await User.find({ role: 'supervisor' }).select('name supervisorId employees').lean();
-      return res.json(list.map((s: any) => ({ _id: s._id, name: s.name, supervisorId: s.supervisorId, employees: s.employees })));
+      const list = await User.find({ role: 'supervisor', isActive: true }).select('name supervisorId employees').lean();
+      const filtered = list.filter(hasAnyTeam);
+      return res.json(filtered.map((s: any) => ({ _id: s._id, name: s.name, supervisorId: s.supervisorId, employees: s.employees })));
     }
 
     // Supervisor sees only their own supervisor environment (their user doc)
@@ -32,7 +45,7 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
     }
 
     // Default: return supervisors only
-    const sup = await User.find({ role: 'supervisor' }).select('name supervisorId employees').lean();
+    const sup = await User.find({ role: 'supervisor', isActive: true }).select('name supervisorId employees').lean();
     res.json(sup.map((s: any) => ({ _id: s._id, name: s.name, supervisorId: s.supervisorId, employees: s.employees })));
   } catch (e) {
     console.error(e);

@@ -15,16 +15,51 @@ export function useAttendance() {
   }); // Janeiro 2026
   const [selectedSupervisor, setSelectedSupervisor] = useState<string | 'all'>('all');
   const [currentUserRole, setCurrentUserRole] = useState<'admin' | 'supervisor' | 'expectador'>('admin');
-  const [supervisorsState, setSupervisorsState] = useState(() => mockSupervisors);
-  const [employeesState, setEmployeesState] = useState(() => employees);
+  const [supervisorsState, setSupervisorsState] = useState(() => [] as any[]);
+  const [employeesState, setEmployeesState] = useState(() => [] as any[]);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [dirtyRecordKeys, setDirtyRecordKeys] = useState<Set<string>>(new Set());
 
   // helper to slugify names for stable ids
   const slug = (s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+  const dedupeById = (list: any[]) => {
+    const map = new Map<string, any>();
+    (list || []).forEach((item: any) => {
+      if (!item) return;
+      const key = String(item.id || '').trim();
+      if (!key) return;
+      if (!map.has(key)) map.set(key, item);
+    });
+    return Array.from(map.values());
+  };
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [justifications, setJustifications] = useState<Justification[]>([]);
 
+  const makeRecordKey = (employeeId: string, day: string) => `${employeeId}__${day}`;
+
+  const recordsMap = useMemo(() => {
+    const map = new Map<string, AttendanceRecord>();
+    for (const record of records) {
+      map.set(makeRecordKey(record.employeeId, record.day), record);
+    }
+    return map;
+  }, [records]);
+
+  const employeesById = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const employee of employeesState as any[]) {
+      map.set(String(employee?.id || ''), employee);
+    }
+    return map;
+  }, [employeesState]);
+
   // auth context (for saving/fetching persisted data)
   const { accessToken, user } = useAuth();
+
+  const refreshData = useCallback(() => {
+    setRefreshTick((value) => value + 1);
+  }, []);
 
   // Gera o período do dia 26 do mês corrente até 25 do mês seguinte.
   const daysInMonth = useMemo(() => {
@@ -47,66 +82,28 @@ export function useAttendance() {
     return days;
   }, [currentDate]);
 
+  const periodStart = daysInMonth[0]?.day;
+  const periodEnd = daysInMonth[daysInMonth.length - 1]?.day;
+
+  const employeesQueryString = useMemo(() => {
+    const params = new URLSearchParams();
+    if (currentUserRole === 'expectador') {
+      params.set('changedOnly', 'true');
+      if (periodStart) params.set('startDay', periodStart);
+      if (periodEnd) params.set('endDay', periodEnd);
+      if (selectedSupervisor !== 'all') {
+        params.set('supervisorUserId', String(selectedSupervisor));
+      }
+    } else if (selectedSupervisor !== 'all') {
+      params.set('supervisorUserId', String(selectedSupervisor));
+    }
+    const query = params.toString();
+    return query ? `?${query}` : '';
+  }, [currentUserRole, selectedSupervisor, periodStart, periodEnd]);
+
   const filteredEmployees = useMemo(() => {
-    if (selectedSupervisor === 'all') {
-      return employeesState;
-    }
-
-    // Prefer employees that have attendance records when a supervisor is selected.
-    const supLower = String(selectedSupervisor).toLowerCase();
-
-    // collect employee ids present in records relevant to this supervisor
-    const idsFromRecords = new Set<string>();
-    records.forEach(r => {
-      const empId = String(r.employeeId || '').toLowerCase();
-      const recSup = String(r.supervisorId || '').toLowerCase();
-      if (!empId) return;
-      if (recSup === supLower || recSup === 'global' || empId.startsWith(supLower + '-') || empId.includes('-' + supLower)) {
-        idsFromRecords.add(empId);
-      }
-    });
-
-    const result: any[] = [];
-    // include employees derived from records first (ensure same identity)
-    idsFromRecords.forEach(eid => {
-      let found = employeesState.find(e => (e.id || '').toString().toLowerCase() === eid || slug(String(e.name || e.id || '')).toLowerCase() === eid);
-      if (!found) {
-        const parts = eid.split('-');
-        const namePart = parts.slice(1).join('-') || parts[0];
-        found = { id: eid, name: namePart, role: 'FUNCIONÁRIO', supervisorId: parts[0] || selectedSupervisor };
-      }
-      const empNameSlug = slug(String(found.name || found.id || '')).toLowerCase();
-      if (found.id === selectedSupervisor || empNameSlug === supLower) return;
-      result.push(found);
-    });
-
-    if (result.length > 0) {
-      const seen = new Set<string>();
-      return result.filter(r => {
-        const key = slug(String(r.name || r.id || '')).toLowerCase();
-        if (seen.has(key)) return false; seen.add(key); return true;
-      });
-    }
-
-    // fallback: original tolerant filter
-    return employeesState.filter(emp => {
-      const empSup = (emp.supervisorId || '').toString();
-      if (!supLower) return false;
-      const empNameSlug = slug(String(emp.name || emp.id || '')).toLowerCase();
-      if (emp.id === selectedSupervisor || empNameSlug === supLower) return false;
-      if (empSup === selectedSupervisor) return true;
-      if (empSup.toLowerCase() === supLower) return true;
-      if (empSup.toLowerCase() === 'global') return true;
-      if ((emp.id || '').toString().toLowerCase().startsWith(supLower + '-')) return true;
-      if ((emp.id || '').toString().toLowerCase().includes('-' + supLower)) return true;
-      if (empSup.toLowerCase().includes(supLower)) return true;
-      try {
-        const mockMatch = mockSupervisors.find(s => s.name?.toLowerCase() === supLower || (s.id || '').toString().toLowerCase() === supLower);
-        if (mockMatch && emp.supervisorId && emp.supervisorId === mockMatch.id) return true;
-      } catch (e) {}
-      return false;
-    });
-  }, [selectedSupervisor, employeesState, records]);
+    return dedupeById(employeesState);
+  }, [employeesState]);
 
   const currentSupervisor = useMemo(() => {
     if (selectedSupervisor === 'all') return null;
@@ -117,6 +114,12 @@ export function useAttendance() {
   useEffect(() => {
     let mounted = true;
     (async () => {
+      if (!accessToken) {
+        if (!mounted) return;
+        setSupervisorsState(mockSupervisors);
+        setEmployeesState(employees);
+        return;
+      }
       try {
         const res = await fetch('/api/supervisors', {
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -126,41 +129,26 @@ export function useAttendance() {
         if (!mounted) return;
         // map backend users -> Supervisor[] shape expected by UI
         const mapped = data.map((u: any) => ({
-          // Prefer `supervisorId` (stable slug) when present, fallback to _id
-          id: (u.supervisorId || u._id || u.id).toString(),
+          // Always use unique user id for filter select value
+          id: (u._id || u.id || u.supervisorId).toString(),
           name: u.name,
           store: `REGIÃO - ${u.name}`,
         }));
-        // remove duplicates by first name (case-insensitive), prefer the longest full name
-        const byFirstName: Record<string, any> = {};
-        mapped.forEach(m => {
-          const first = (m.name || '').split(/\s+/)[0]?.toLowerCase() || m.name.toLowerCase();
-          const existing = byFirstName[first];
-          if (!existing) {
-            byFirstName[first] = m;
-          } else {
-            // prefer the longer, more descriptive name (e.g., 'RODNEY DE MACEDO' over 'RODNEY')
-            if ((m.name || '').length > (existing.name || '').length) {
-              byFirstName[first] = m;
-            }
-          }
-        });
-        const deduped = Object.values(byFirstName);
+        const deduped = dedupeById(mapped);
         setSupervisorsState(deduped);
+
         // Try to load canonical employees list from backend (preferred)
+        let employeesLoadedFromApi = false;
         try {
-          const empRes = await fetch('/api/employees', {
+          const empRes = await fetch(`/api/employees${employeesQueryString}`, {
             headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
           });
           if (empRes.ok) {
             const emps = await empRes.json();
-            if (mounted && Array.isArray(emps) && emps.length > 0) {
-              // Map backend employees to UI shape and replace current list
+            if (mounted && Array.isArray(emps)) {
               const mapped = emps.map((e: any) => ({ id: e.id || `${e.supervisorId}-${e.slug}`, name: e.name || e.displayName || e.slug, role: e.role || 'FUNCIONÁRIO', supervisorId: e.supervisorId }));
-              // dedupe by slug
-              const map: Record<string, any> = {};
-              mapped.forEach((m: any) => { const key = slug(String(m.name || m.id || '')); if (key) map[key] = m; });
-              setEmployeesState(Object.values(map));
+              setEmployeesState(dedupeById(mapped));
+              employeesLoadedFromApi = true;
             }
           }
         } catch (e) {
@@ -178,14 +166,8 @@ export function useAttendance() {
             derivedEmployees.push({ id, name, role: e.role || 'FUNCIONÁRIO', supervisorId: supId });
           });
         });
-        if (derivedEmployees.length > 0) {
-          // Prefer backend-derived employees as canonical. Replace the current
-          // employees list with derived ones, but keep any non-colliding mock
-          // employees to avoid losing unrelated data.
-          const map: Record<string, any> = {};
-          derivedEmployees.forEach((d: any) => { if (d) { const key = slug(String(d.name || d.id || '')); if (key) map[key] = d; } });
-          (employees || []).forEach((p: any) => { if (p) { const key = slug(String(p.name || p.id || '')); if (key && !map[key]) map[key] = p; } });
-          setEmployeesState(Object.values(map));
+        if (!employeesLoadedFromApi && derivedEmployees.length > 0) {
+          setEmployeesState(dedupeById(derivedEmployees));
         }
       } catch (e) {
         // keep mock supervisors if fetch fails
@@ -193,13 +175,14 @@ export function useAttendance() {
       }
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [accessToken, employeesQueryString, refreshTick]);
 
   // Load persisted attendance + justifications when authenticated
   useEffect(() => {
     let mounted = true;
     (async () => {
       if (!accessToken) return;
+      if (hasUnsavedChanges) return;
       try {
         const attRes = await fetch('/api/attendance', {
           headers: { Authorization: `Bearer ${accessToken}` },
@@ -208,30 +191,8 @@ export function useAttendance() {
           const att = await attRes.json();
           if (!mounted) return;
           setRecords(att.map((r: any) => ({ employeeId: r.employeeId, day: r.day, apontador: r.apontador, supervisor: r.supervisor })));
-
-          // If supervisors endpoint didn't provide employees, derive employees from attendance records
-          try {
-            const existingEmployees = (att || []).map((r: any) => ({ id: r.employeeId, name: r.employeeName || r.employeeId, supervisorId: r.supervisorId || (r.employeeId && r.employeeId.includes('-') ? r.employeeId.split('-')[0] : '') }));
-            // dedupe by id
-            const byId: Record<string, any> = {};
-            for (const e of existingEmployees) {
-              if (!e.id) continue;
-              if (!byId[e.id]) byId[e.id] = e;
-            }
-            const derived = Object.values(byId);
-            if (derived.length > 0) {
-              // merge derived attendance-based employees with existing mocks
-              // dedupe by slug(name) so we don't show the same person twice
-              setEmployeesState(prev => {
-                const map: Record<string, any> = {};
-                prev.forEach((p: any) => { if (p) { const key = slug(String(p.name || p.id || '')); if (key) map[key] = p; } });
-                derived.forEach((d: any) => { if (d) { const key = slug(String(d.name || d.id || '')); if (key) map[key] = d; } });
-                return Object.values(map);
-              });
-            }
-          } catch (e) {
-            // ignore
-          }
+          setDirtyRecordKeys(new Set());
+          setHasUnsavedChanges(false);
         }
 
         const justRes = await fetch('/api/attendance/justifications', {
@@ -247,13 +208,24 @@ export function useAttendance() {
       }
     })();
     return () => { mounted = false; };
-  }, [accessToken]);
+  }, [accessToken, refreshTick, hasUnsavedChanges]);
+
+  // Auto-refresh for non-admin users so status updates from admin appear without full page reload.
+  useEffect(() => {
+    if (!accessToken) return;
+    if (currentUserRole === 'admin') return;
+    if (hasUnsavedChanges) return;
+    const timer = setInterval(() => {
+      setRefreshTick((value) => value + 1);
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [accessToken, currentUserRole, hasUnsavedChanges]);
 
   const getRecord = useCallback((employeeId: string, day: string): AttendanceRecord => {
-    const existing = records.find(r => r.employeeId === employeeId && r.day === day);
+    const existing = recordsMap.get(makeRecordKey(employeeId, day));
     if (existing) return existing;
     return { employeeId, day, apontador: '', supervisor: '' };
-  }, [records]);
+  }, [recordsMap]);
 
   const updateRecord = useCallback((
     employeeId: string,
@@ -261,6 +233,13 @@ export function useAttendance() {
     field: 'apontador' | 'supervisor',
     value: AttendanceCode
   ) => {
+    const key = makeRecordKey(employeeId, day);
+    setDirtyRecordKeys(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+    setHasUnsavedChanges(true);
     setRecords(prev => {
       const JUST_CODES_TO_PREFILL: AttendanceCode[] = ['AT', 'ABF', 'ABT'];
       const index = prev.findIndex(r => r.employeeId === employeeId && r.day === day);
@@ -291,7 +270,7 @@ export function useAttendance() {
     // criar/atualizar uma justificativa pré-preenchida com "Nome — DD/MM/YYYY".
     const JUST_CODES_TO_PREFILL: AttendanceCode[] = ['AT', 'ABF', 'ABT'];
     if (field === 'supervisor' && JUST_CODES_TO_PREFILL.includes(value as AttendanceCode)) {
-      const emp = employees.find((e) => e.id === employeeId);
+      const emp = employeesState.find((e) => e.id === employeeId);
       const dayInfo = daysInMonth.find((d) => d.day === day);
       const empName = emp?.name ?? employeeId;
       const dateBr = dayInfo ? format(dayInfo.date, 'dd/MM/yyyy') : day;
@@ -303,9 +282,11 @@ export function useAttendance() {
         return [{ id: `just-${Date.now()}`, employeeId, day, text: placeholder }, ...prev];
       });
     }
-  }, [employees, daysInMonth]);
+  }, [employeesState, daysInMonth]);
 
   const clearAll = useCallback(() => {
+    setHasUnsavedChanges(true);
+    setDirtyRecordKeys(new Set());
     setRecords([]);
     setJustifications([]);
   }, []);
@@ -317,8 +298,11 @@ export function useAttendance() {
     applyToSupervisor?: boolean,
     supervisorCode?: AttendanceCode
   ) => {
+    setHasUnsavedChanges(true);
+    const newJustification = { id: `just-${Date.now()}`, employeeId, day, text };
+
     setJustifications(prev => [
-      { id: `just-${Date.now()}`, employeeId, day, text },
+      newJustification,
       ...prev,
     ]);
 
@@ -328,11 +312,106 @@ export function useAttendance() {
       // atualiza o registro do supervisor para este dia
       updateRecord(employeeId, day, 'supervisor', supervisorCode);
     }
-  }, [updateRecord]);
+
+    // Autosave para alterações vindas da seção de justificativas.
+    // Se falhar, o usuário ainda pode usar o botão "Salvar" da tabela normalmente.
+    if (!accessToken) return;
+
+    void (async () => {
+      try {
+        const existing = recordsMap.get(makeRecordKey(employeeId, day));
+        const employee = employeesById.get(employeeId) as any;
+
+        if (applyToSupervisor && supervisorCode && JUST_CODES_TO_PREFILL.includes(supervisorCode)) {
+          const attendancePayload = {
+            records: [
+              {
+                employeeId,
+                day,
+                apontador: existing?.apontador || '',
+                supervisor: supervisorCode,
+                employeeName: employee?.name || '',
+                supervisorId: employee?.supervisorId || '',
+              },
+            ],
+          };
+
+          const attendanceRes = await fetch('/api/attendance', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(attendancePayload),
+          });
+
+          if (!attendanceRes.ok) {
+            const bodyText = await attendanceRes.text().catch(() => '');
+            throw new Error(`Autosave attendance failed: ${attendanceRes.status} ${bodyText}`);
+          }
+
+          const key = makeRecordKey(employeeId, day);
+          setDirtyRecordKeys(prev => {
+            if (!prev.has(key)) return prev;
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        }
+
+        const justRes = await fetch('/api/attendance/justifications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ justifications: [{ employeeId, day, text }] }),
+        });
+
+        if (!justRes.ok) {
+          const bodyText = await justRes.text().catch(() => '');
+          throw new Error(`Autosave justification failed: ${justRes.status} ${bodyText}`);
+        }
+      } catch (error) {
+        console.error('Autosave from justifications failed. You can still use Save button.', error);
+      }
+    })();
+  }, [updateRecord, accessToken, recordsMap, employeesById]);
 
   const removeJustification = useCallback((id: string) => {
+    const current = justifications.find(j => j.id === id);
+    if (!current) return;
+
+    setHasUnsavedChanges(true);
     setJustifications(prev => prev.filter(j => j.id !== id));
-  }, []);
+
+    if (!accessToken) return;
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/attendance/justifications', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ id: current.id, employeeId: current.employeeId, day: current.day }),
+        });
+
+        if (!res.ok) {
+          const bodyText = await res.text().catch(() => '');
+          throw new Error(`Delete justification failed: ${res.status} ${bodyText}`);
+        }
+      } catch (error) {
+        console.error('Failed to delete justification in backend', error);
+        setJustifications(prev => {
+          const exists = prev.some(j => j.id === current.id);
+          if (exists) return prev;
+          return [current, ...prev];
+        });
+      }
+    })();
+  }, [justifications, accessToken]);
 
   const getTotals = useCallback((day: string) => {
     let totalFaltas = 0;
@@ -377,19 +456,35 @@ export function useAttendance() {
   // Save records + justifications to backend
   const saveAll = useCallback(async () => {
     try {
+      const recordsToSave = dirtyRecordKeys.size > 0
+        ? records.filter((r) => dirtyRecordKeys.has(makeRecordKey(r.employeeId, r.day)))
+        : [];
+
       // DEBUG: log payload to help diagnose save failures in browser
-      try { console.debug('[saveAll] sending records', records); } catch (e) {}
-      const res = await fetch('/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: accessToken ? `Bearer ${accessToken}` : '' },
-        body: JSON.stringify({ records }),
-      });
-      if (!res.ok) {
-        // attempt to read body for debugging
-        let bodyText = '';
-        try { bodyText = await res.text(); } catch (e) { bodyText = '<no body>'; }
-        console.error('[saveAll] POST /api/attendance failed', res.status, bodyText);
-        throw new Error('Failed to save attendance');
+      try { console.debug('[saveAll] sending records(delta)', recordsToSave); } catch (e) {}
+
+      if (recordsToSave.length > 0) {
+        const res = await fetch('/api/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: accessToken ? `Bearer ${accessToken}` : '' },
+          body: JSON.stringify({
+            records: recordsToSave.map(r => {
+              const employee = employeesById.get(r.employeeId) as any;
+              return {
+                ...r,
+                employeeName: employee?.name || '',
+                supervisorId: employee?.supervisorId || '',
+              };
+            }),
+          }),
+        });
+        if (!res.ok) {
+          // attempt to read body for debugging
+          let bodyText = '';
+          try { bodyText = await res.text(); } catch (e) { bodyText = '<no body>'; }
+          console.error('[saveAll] POST /api/attendance failed', res.status, bodyText);
+          throw new Error('Failed to save attendance');
+        }
       }
 
       if (justifications.length > 0) {
@@ -420,19 +515,13 @@ export function useAttendance() {
         }
         // Re-fetch canonical employees so UI uses current server-side list
         try {
-          const empRes = await fetch('/api/employees', { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined });
+          const empRes = await fetch(`/api/employees${employeesQueryString}`, {
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+          });
           if (empRes.ok) {
             const emps = await empRes.json();
             const mapped = (Array.isArray(emps) ? emps : []).map((e: any) => ({ id: e.id || `${e.supervisorId}-${e.slug}`, name: e.name || e.displayName || e.slug, role: e.role || 'FUNCIONÁRIO', supervisorId: e.supervisorId }));
-            // Merge returned employees with existing local list instead of replacing it
-            setEmployeesState(prev => {
-              const merged: Record<string, any> = {};
-              // start with previous employees
-              prev.forEach((p: any) => { const key = slug(String(p.name || p.id || '')); if (key) merged[key] = p; });
-              // overwrite/add with server-provided employees
-              mapped.forEach((m: any) => { const key = slug(String(m.name || m.id || '')); if (key) merged[key] = m; });
-              return Object.values(merged);
-            });
+            setEmployeesState(dedupeById(mapped));
           }
         } catch (e) {
           // ignore employee refresh errors
@@ -442,12 +531,15 @@ export function useAttendance() {
         console.warn('Saved but failed to refresh local state', e);
       }
 
+      setHasUnsavedChanges(false);
+      setDirtyRecordKeys(new Set());
+
       return true;
     } catch (e) {
       console.error('Failed to save attendance', e);
       return false;
     }
-  }, [records, justifications, accessToken]);
+  }, [records, justifications, accessToken, employeesQueryString, dirtyRecordKeys, employeesById]);
 
   return {
     currentDate,
@@ -470,6 +562,7 @@ export function useAttendance() {
     getTotals,
     generateExportData,
     saveAll,
+    refreshData,
   };
 }
 

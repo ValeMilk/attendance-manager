@@ -30,9 +30,10 @@ export function JustificationsSection({
   const [supervisorCode, setSupervisorCode] = useState('AT');
 
   const handleAdd = () => {
-    if (currentUserRole === 'expectador') return; // espectador não pode adicionar
+    if (currentUserRole === 'expectador') return;
     if (newEmployeeId && newDay && newText.trim()) {
-      onAdd(newEmployeeId, newDay, newText.trim(), applyToSupervisor, applyToSupervisor ? (supervisorCode as any) : undefined);
+      const willApply = applyToSupervisor;
+      onAdd(newEmployeeId, newDay, newText.trim(), willApply, willApply ? (supervisorCode as any) : undefined);
       setNewEmployeeId('');
       setNewDay('');
       setNewText('');
@@ -50,65 +51,75 @@ export function JustificationsSection({
       <div className="table-header-cell px-4 py-3">
         <h3 className="font-semibold text-sm">JUSTIFICATIVA DA FALTA ABONADA</h3>
       </div>
-      
+
       <div className="p-4 space-y-4">
-        {/* Add new justification */}
+        {/* Formulário de nova justificativa */}
         {currentUserRole !== 'expectador' && (
           <div className="flex gap-2 items-end flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-xs text-muted-foreground mb-1 block">Funcionário</label>
-            <Select value={newEmployeeId} onValueChange={setNewEmployeeId}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Selecione..." />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map(emp => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="w-[100px]">
-            <label className="text-xs text-muted-foreground mb-1 block">Dia</label>
-            <Select value={newDay} onValueChange={setNewDay}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Dia" />
-              </SelectTrigger>
-              <SelectContent>
-                {daysInMonth.map(d => (
-                  <SelectItem key={d.day} value={d.day}>
-                    {format(d.date, 'd')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex-[2] min-w-[300px]">
-            <label className="text-xs text-muted-foreground mb-1 block">Justificativa</label>
-            <Input
-              value={newText}
-              onChange={(e) => setNewText(e.target.value)}
-              placeholder="Digite a justificativa..."
-              className="h-9"
-            />
-          </div>
-
-          <div className="w-[220px] flex items-center gap-2">
-            <label className="text-xs text-muted-foreground mb-1 block w-full">Aplicar ao supervisor?</label>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" checked={applyToSupervisor} onChange={(e) => setApplyToSupervisor(e.target.checked)} className="w-4 h-4" />
-              <select value={supervisorCode} onChange={(e) => setSupervisorCode(e.target.value)} className="h-9 rounded border px-2 text-sm" disabled={!applyToSupervisor}>
-                <option value="AT">AT — ATESTADO</option>
-                <option value="ABF">ABF — ABONO FALTA</option>
-                <option value="ABT">ABT — ABONO TRAB</option>
-              </select>
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Funcionário</label>
+              <Select value={newEmployeeId} onValueChange={setNewEmployeeId}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map(emp => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-          
+
+            <div className="w-[100px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Dia</label>
+              <Select value={newDay} onValueChange={setNewDay}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Dia" />
+                </SelectTrigger>
+                <SelectContent>
+                  {daysInMonth.map(d => (
+                    <SelectItem key={d.day} value={d.day}>
+                      {format(d.date, 'd')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex-[2] min-w-[300px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Justificativa</label>
+              <Input
+                value={newText}
+                onChange={(e) => setNewText(e.target.value)}
+                placeholder="Digite a justificativa..."
+                className="h-9"
+              />
+            </div>
+
+            <div className="w-[240px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Aplicar ao supervisor?</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={applyToSupervisor}
+                  onChange={(e) => setApplyToSupervisor(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <select
+                  value={supervisorCode}
+                  onChange={(e) => setSupervisorCode(e.target.value)}
+                  className="h-9 rounded border px-2 text-sm flex-1"
+                  disabled={!applyToSupervisor}
+                >
+                  <option value="AT">AT — ATESTADO</option>
+                  <option value="ABF">ABF — ABONO FALTA</option>
+                  <option value="ABT">ABT — ABONO TRAB</option>
+                </select>
+              </div>
+            </div>
+
             <Button onClick={handleAdd} size="sm" className="h-9">
               <Plus className="w-4 h-4 mr-1" />
               Adicionar
@@ -116,8 +127,8 @@ export function JustificationsSection({
           </div>
         )}
 
-        {/* Justifications list */}
-        {justifications.length > 0 && (
+        {/* Lista de justificativas */}
+        {justifications.length > 0 ? (
           <div className="border border-border rounded-md overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -138,11 +149,11 @@ export function JustificationsSection({
                       {currentUserRole !== 'expectador' && (
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
                           onClick={() => onRemove(just.id)}
-                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          className="h-7 w-7 text-destructive hover:text-destructive/80"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       )}
                     </td>
@@ -151,9 +162,7 @@ export function JustificationsSection({
               </tbody>
             </table>
           </div>
-        )}
-
-        {justifications.length === 0 && (
+        ) : (
           <p className="text-center text-muted-foreground py-4 text-sm">
             Nenhuma justificativa cadastrada
           </p>

@@ -25,7 +25,7 @@ const attendanceRecordSchema = new mongoose.Schema(
     },
     supervisor: {
       type: String,
-      enum: ['P', 'F', 'FT', 'FM', 'AT', 'ABF', 'ABT', 'FERI', ''],
+      enum: ['P', 'F', 'FT', 'FM', 'AT', 'ABF', 'ABT', 'FER', 'FERI', 'FOLGA', ''],
       default: '',
     },
     justifications: [
