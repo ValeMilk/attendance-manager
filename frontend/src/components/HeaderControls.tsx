@@ -152,7 +152,7 @@ export function HeaderControls({
               variant={isMonthLocked ? 'destructive' : 'default'}
               size="sm"
               onClick={async () => {
-                const success = await onToggleMonthLock(!isMonthLocked);
+                const success = await onToggleMonthLock(isMonthLocked);
                 if (success) {
                   const action = isMonthLocked ? 'liberado' : 'bloqueado';
                   alert(`Mês ${action} com sucesso!`);

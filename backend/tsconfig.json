@@ -10,5 +10,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "moduleResolution": "node"
-  }
+  },
+  "exclude": ["scripts/**", "node_modules", "dist"]
 }
