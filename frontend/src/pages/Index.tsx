@@ -58,9 +58,9 @@ const Index = () => {
   // persist currentDate so page reload keeps the current period
   usePersistCurrentDate(currentDate);
 
-  // Auto-select first supervisor when switching to supervisor role
+  // Auto-select first supervisor when switching to supervisor/expectador role
   useEffect(() => {
-    if (currentUserRole === 'supervisor' && selectedSupervisor === 'all') {
+    if ((currentUserRole === 'supervisor' || currentUserRole === 'expectador') && selectedSupervisor === 'all') {
       setSelectedSupervisor(supervisors[0]?.id || 'all');
     }
   }, [currentUserRole, selectedSupervisor, supervisors, setSelectedSupervisor]);

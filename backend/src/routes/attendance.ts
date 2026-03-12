@@ -186,7 +186,19 @@ router.post('/justifications', authenticateJWT, async (req: AuthRequest, res) =>
     const { justifications } = req.body;
     if (!Array.isArray(justifications)) return res.status(400).json({ message: 'Invalid payload' });
     for (const j of justifications) {
-      await Justification.findOneAndUpdate({ employeeId: j.employeeId, day: j.day }, { $set: { text: j.text, createdBy: req.userId } }, { upsert: true });
+      // Extract supervisorId from employeeId prefix (e.g., "mariana-moura-max" -> "mariana-moura")
+      const supervisorIdFromEmployee = j.employeeId?.split('-').slice(0, -1).join('-') || null;
+      await Justification.findOneAndUpdate(
+        { employeeId: j.employeeId, day: j.day },
+        {
+          $set: {
+            text: j.text,
+            createdBy: req.userId,
+            supervisorId: supervisorIdFromEmployee, // Denormalize supervisorId for fast queries
+          },
+        },
+        { upsert: true }
+      );
     }
     res.json({ ok: true });
   } catch (e) {
@@ -202,14 +214,15 @@ router.get('/justifications', authenticateJWT, async (req: AuthRequest, res) => 
     if (role === 'supervisor') {
       const user = await User.findById(req.userId).lean();
       if (!user) return res.status(404).json({ message: 'User not found' });
-      const all = await Justification.find({}).lean();
-      const filtered = all.filter(j => j.employeeId.startsWith((user as any).supervisorId || ''));
+      // Use denormalized supervisorId field for O(log n + k) index lookup instead of O(n) regex
+      const filtered = await Justification.find({ supervisorId: (user as any).supervisorId || '' }).lean();
       return res.json(filtered);
     }
     if (role === 'admin' || role === 'expectador') {
       if (supervisorId) {
         const sup = supervisorId as string;
-        const list = await Justification.find({ employeeId: new RegExp(`^${sup}-`) }).lean();
+        // Use denormalized supervisorId field for O(log n + k) index lookup instead of O(n·m) regex
+        const list = await Justification.find({ supervisorId: sup }).lean();
         return res.json(list);
       }
       const all = await Justification.find({}).lean();

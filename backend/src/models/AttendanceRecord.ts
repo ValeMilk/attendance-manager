@@ -42,5 +42,7 @@ const attendanceRecordSchema = new mongoose.Schema(
 
 // Compound index for unique records per employee/day
 attendanceRecordSchema.index({ employeeId: 1, day: 1, supervisorId: 1 }, { unique: true });
+// Secondary index for supervisor-filtered queries (Phase 1 optimization)
+attendanceRecordSchema.index({ supervisorId: 1, day: 1 });
 
 export const AttendanceRecord = mongoose.model('AttendanceRecord', attendanceRecordSchema);

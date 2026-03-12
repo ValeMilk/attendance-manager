@@ -29,7 +29,7 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
       return res.json(filtered.map((s: any) => ({ _id: s._id, name: s.name, supervisorId: s.supervisorId, employees: s.employees, role: s.role })));
     }
 
-    // Expectador sees all supervisors with any team
+    // Expectador sees supervisors with any team (including manager teams like Rodney)
     if (role === 'expectador') {
       const list = await User.find({ role: 'supervisor', isActive: true }).select('name supervisorId employees').lean();
       const filtered = list.filter(hasAnyTeam);

@@ -94,14 +94,26 @@ export function useAttendance() {
     return query ? `?${query}` : '';
   }, [selectedSupervisor]);
 
-  const isSupervisorRole = (role: string) =>
-    String(role || '').toLowerCase() === 'supervisor';
+  const isSupervisorRole = (role: string) => {
+    const normalized = String(role || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    return normalized === 'supervisor';
+  };
 
   const filteredEmployees = useMemo(() => {
-    return dedupeById(employeesState).filter(
+    const workers = dedupeById(employeesState).filter(
       (e: any) => !isSupervisorRole(e.role)
     );
-  }, [employeesState]);
+
+    if (selectedSupervisor === 'all') return workers;
+
+    return workers.filter(
+      (e: any) => String(e?.supervisorUserId || '') === String(selectedSupervisor)
+    );
+  }, [employeesState, selectedSupervisor]);
 
   const currentSupervisor = useMemo(() => {
     if (selectedSupervisor === 'all') return null;
@@ -145,8 +157,14 @@ export function useAttendance() {
             const emps = await empRes.json();
             if (mounted && Array.isArray(emps)) {
               const mapped = emps
-                .filter((e: any) => String(e.role || '').toLowerCase() !== 'supervisor')
-                .map((e: any) => ({ id: e.id || `${e.supervisorId}-${e.slug}`, name: e.name || e.displayName || e.slug, role: e.role || 'FUNCIONÁRIO', supervisorId: e.supervisorId }));
+                .filter((e: any) => !isSupervisorRole(e.role || ''))
+                .map((e: any) => ({
+                  id: e.id || `${e.supervisorId}-${e.slug}`,
+                  name: e.name || e.displayName || e.slug,
+                  role: e.role || 'FUNCIONÁRIO',
+                  supervisorId: e.supervisorId,
+                  supervisorUserId: e.supervisorUserId || (selectedSupervisor !== 'all' ? String(selectedSupervisor) : ''),
+                }));
               setEmployeesState(dedupeById(mapped));
               employeesLoadedFromApi = true;
             }
@@ -159,12 +177,13 @@ export function useAttendance() {
         const derivedEmployees: any[] = [];
         data.forEach((u: any) => {
           const supId = (u.supervisorId || u._id || u.id).toString();
+          const supUserId = (u._id || u.id || '').toString();
           const emps = Array.isArray(u.employees) ? u.employees : [];
           emps.forEach((e: any, idx: number) => {
-            if (String(e.role || '').toLowerCase() === 'supervisor') return;
+            if (isSupervisorRole(e.role || '')) return;
             const name = e.name || e.employeeName || (`employee-${idx}`);
             const id = `${supId}-${slug(name)}`;
-            derivedEmployees.push({ id, name, role: e.role || 'FUNCIONÁRIO', supervisorId: supId });
+            derivedEmployees.push({ id, name, role: e.role || 'FUNCIONÁRIO', supervisorId: supId, supervisorUserId: supUserId });
           });
         });
         if (!employeesLoadedFromApi && derivedEmployees.length > 0) {
@@ -521,7 +540,13 @@ export function useAttendance() {
           });
           if (empRes.ok) {
             const emps = await empRes.json();
-            const mapped = (Array.isArray(emps) ? emps : []).map((e: any) => ({ id: e.id || `${e.supervisorId}-${e.slug}`, name: e.name || e.displayName || e.slug, role: e.role || 'FUNCIONÁRIO', supervisorId: e.supervisorId }));
+            const mapped = (Array.isArray(emps) ? emps : []).map((e: any) => ({
+              id: e.id || `${e.supervisorId}-${e.slug}`,
+              name: e.name || e.displayName || e.slug,
+              role: e.role || 'FUNCIONÁRIO',
+              supervisorId: e.supervisorId,
+              supervisorUserId: e.supervisorUserId || (selectedSupervisor !== 'all' ? String(selectedSupervisor) : ''),
+            }));
             setEmployeesState(dedupeById(mapped));
           }
         } catch (e) {

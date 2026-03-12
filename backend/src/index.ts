@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import dns from 'dns';
+import { Server } from 'http';
 import authRoutes from './routes/auth.js';
 import usersRoutes from './routes/users.js';
 import attendanceRoutes from './routes/attendance.js';
@@ -27,11 +28,115 @@ app.use('/api/employees', employeesRoutes);
 
 const port = process.env.PORT || 5000;
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/attendance-manager';
+const host = '127.0.0.1';
+const reconnectIntervalMs = 10000;
+
+const mongooseConnectOptions = {
+  serverSelectionTimeoutMS: 60000,
+  socketTimeoutMS: 60000,
+  connectTimeoutMS: 60000,
+  family: 4 as const,
+  retryWrites: true,
+  maxPoolSize: 10,
+  minPoolSize: 5,
+};
+
+let server: Server | null = null;
+let reconnectTimer: NodeJS.Timeout | null = null;
+let connecting = false;
 
 console.log('🔍 Debug Info:');
 console.log('MongoDB URI carregada:', mongoUri ? '✅ Sim' : '❌ Não');
 console.log('PORT:', port);
 console.log('NODE_ENV:', process.env.NODE_ENV);
+
+function startHttpServer() {
+  if (server?.listening) return;
+
+  server = app.listen(Number(port), host, () => {
+    console.log(`✅ Backend listening on http://${host}:${port}`);
+  });
+
+  server.on('error', (error: any) => {
+    if (error?.code === 'EADDRINUSE') {
+      console.error(`❌ Porta ${port} em uso. Nova tentativa em 3s...`);
+      setTimeout(() => startHttpServer(), 3000);
+      return;
+    }
+    console.error('❌ Erro no servidor HTTP:', error);
+  });
+}
+
+async function connectMongo() {
+  if (connecting || mongoose.connection.readyState === 1) return;
+  connecting = true;
+  try {
+    console.log('📡 Conectando ao MongoDB...');
+    await mongoose.connect(mongoUri, mongooseConnectOptions);
+    console.log('✅ Conectado ao MongoDB com sucesso!');
+    if (reconnectTimer) {
+      clearInterval(reconnectTimer);
+      reconnectTimer = null;
+    }
+  } catch (error) {
+    console.error('❌ Falha ao conectar no MongoDB:', error);
+  } finally {
+    connecting = false;
+  }
+}
+
+function scheduleMongoReconnect() {
+  if (reconnectTimer) return;
+  console.warn(`⚠️ Tentarei reconectar ao MongoDB a cada ${reconnectIntervalMs / 1000}s.`);
+  reconnectTimer = setInterval(async () => {
+    if (mongoose.connection.readyState === 1) {
+      clearInterval(reconnectTimer!);
+      reconnectTimer = null;
+      return;
+    }
+    console.log('🔁 Tentando reconectar ao MongoDB...');
+    await connectMongo();
+  }, reconnectIntervalMs);
+}
+
+mongoose.connection.on('disconnected', () => {
+  console.warn('⚠️ MongoDB desconectado.');
+  scheduleMongoReconnect();
+});
+
+mongoose.connection.on('error', (error) => {
+  console.error('❌ Erro da conexão MongoDB:', error);
+  scheduleMongoReconnect();
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled Rejection capturada:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception capturada:', error);
+});
+
+async function shutdown(signal: string) {
+  console.log(`\n🛑 Recebido ${signal}. Encerrando backend...`);
+  if (reconnectTimer) {
+    clearInterval(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (server) {
+    await new Promise<void>((resolve) => server!.close(() => resolve()));
+  }
+  await mongoose.disconnect().catch(() => undefined);
+  process.exit(0);
+}
+
+process.on('SIGINT', () => {
+  void shutdown('SIGINT');
+});
+
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM');
+});
 
 async function main() {
   try {
@@ -40,52 +145,17 @@ async function main() {
       dns.setServers(['8.8.8.8', '1.1.1.1']);
       console.log('🔧 DNS servers ajustados para: 8.8.8.8, 1.1.1.1');
     }catch(e){ console.warn('⚠️ Não foi possível setar DNS servers:', e); }
-    // Connect to MongoDB com opções adicionais
-    console.log('\n📡 Conectando ao MongoDB...');
-    await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: 60000, // 60 segundos
-      socketTimeoutMS: 60000,
-      connectTimeoutMS: 60000,
-      family: 4, // IPv4
-      retryWrites: true,
-      maxPoolSize: 10,
-      minPoolSize: 5,
-    });
-    console.log('✅ Conectado ao MongoDB com sucesso!');
+    startHttpServer();
+    await connectMongo();
 
-    // Start server (bind explicitly to IPv4 loopback)
-    app.listen(port, '127.0.0.1', () => {
-      console.log(`✅ Backend listening on http://127.0.0.1:${port}`);
-    });
+    if (mongoose.connection.readyState !== 1) {
+      console.warn('⚠️ Servidor HTTP ativo sem MongoDB no momento.');
+      scheduleMongoReconnect();
+    }
   } catch (err) {
-    console.error('❌ Erro ao conectar ao MongoDB:', err);
-    console.warn('⚠️ O servidor continuará em execução, mas sem conexão com o banco de dados. Tentarei reconectar a cada 10s.');
-
-    // Iniciar servidor mesmo sem DB e tentar reconectar periodicamente
-    app.listen(port, '127.0.0.1', () => {
-      console.log(`✅ Backend listening on http://127.0.0.1:${port} (sem conexão com MongoDB)`);
-    });
-
-    // Tentativa de reconexão periódica (a cada 10s)
-    const retryIntervalMs = 10000;
-    let reconnectTimer: NodeJS.Timer | null = setInterval(async () => {
-      try {
-        console.log('🔁 Tentando reconectar ao MongoDB...');
-        await mongoose.connect(mongoUri, {
-          serverSelectionTimeoutMS: 60000,
-          socketTimeoutMS: 60000,
-          connectTimeoutMS: 60000,
-          family: 4,
-          retryWrites: true,
-          maxPoolSize: 10,
-          minPoolSize: 5,
-        });
-        console.log('✅ Reconectado ao MongoDB com sucesso!');
-        if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
-      } catch (e) {
-        console.warn('⚠️ Reconexão falhou:', e.message || e);
-      }
-    }, retryIntervalMs);
+    console.error('❌ Erro na inicialização:', err);
+    startHttpServer();
+    scheduleMongoReconnect();
   }
 }
 
