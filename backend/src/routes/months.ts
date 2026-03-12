@@ -22,10 +22,13 @@ router.get('/', authenticateJWT, requireRole(['admin']), async (req: AuthRequest
 router.get('/:month', authenticateJWT, async (req: AuthRequest, res) => {
   try {
     const { month } = req.params;
+    console.log(`🔍 Checking status for month: ${month}`);
+    
     // Find or create default status (unlocked = false means locked)
     let status = await MonthStatus.findOne({ month }).lean();
     
     if (!status) {
+      console.log(`📝 Creating new locked MonthStatus for: ${month}`);
       // Auto-create as locked
       await MonthStatus.create({
         month,
@@ -36,6 +39,7 @@ router.get('/:month', authenticateJWT, async (req: AuthRequest, res) => {
       status = await MonthStatus.findOne({ month }).lean();
     }
     
+    console.log(`📊 Month status for ${month}:`, status);
     res.json(status);
   } catch (e) {
     console.error('Failed to fetch month status', e);
@@ -47,6 +51,7 @@ router.get('/:month', authenticateJWT, async (req: AuthRequest, res) => {
 router.post('/:month/unlock', authenticateJWT, requireRole(['admin']), async (req: AuthRequest, res) => {
   try {
     const { month } = req.params;
+    console.log(`🔓 Unlocking month: ${month} by admin: ${req.userId}`);
     
     const status = await MonthStatus.findOneAndUpdate(
       { month },
@@ -60,6 +65,7 @@ router.post('/:month/unlock', authenticateJWT, requireRole(['admin']), async (re
       { upsert: true, new: true }
     ).select('month isLocked unlockedBy unlockedAt');
     
+    console.log(`✅ Month unlocked successfully:`, status);
     res.json({ ok: true, status });
   } catch (e) {
     console.error('Failed to unlock month', e);
@@ -71,6 +77,7 @@ router.post('/:month/unlock', authenticateJWT, requireRole(['admin']), async (re
 router.post('/:month/lock', authenticateJWT, requireRole(['admin']), async (req: AuthRequest, res) => {
   try {
     const { month } = req.params;
+    console.log(`🔒 Locking month: ${month} by admin: ${req.userId}`);
     
     const status = await MonthStatus.findOneAndUpdate(
       { month },
@@ -85,6 +92,7 @@ router.post('/:month/lock', authenticateJWT, requireRole(['admin']), async (req:
       { upsert: true, new: true }
     ).select('month isLocked unlockedBy unlockedAt lockedAt');
     
+    console.log(`✅ Month locked successfully:`, status);
     res.json({ ok: true, status });
   } catch (e) {
     console.error('Failed to lock month', e);

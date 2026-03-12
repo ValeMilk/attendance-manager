@@ -50,10 +50,14 @@ export function useMonthStatus(month: string, accessToken?: string) {
       
       if (res.ok) {
         const data = await res.json();
+        console.log('🔓 Unlock response:', data);
         setMonthStatus(data.status);
+        // Refetch after a small delay to ensure backend persistence
+        setTimeout(() => fetchStatus(), 100);
         return true;
       } else {
         setError('Failed to unlock month');
+        console.error('Unlock failed with status:', res.status);
         return false;
       }
     } catch (e) {
@@ -61,7 +65,7 @@ export function useMonthStatus(month: string, accessToken?: string) {
       setError('Error unlocking month');
       return false;
     }
-  }, [month, accessToken]);
+  }, [month, accessToken, fetchStatus]);
 
   // Lock month (admin only)
   const lockMonth = useCallback(async () => {
@@ -75,10 +79,14 @@ export function useMonthStatus(month: string, accessToken?: string) {
       
       if (res.ok) {
         const data = await res.json();
+        console.log('🔒 Lock response:', data);
         setMonthStatus(data.status);
+        // Refetch after a small delay to ensure backend persistence
+        setTimeout(() => fetchStatus(), 100);
         return true;
       } else {
         setError('Failed to lock month');
+        console.error('Lock failed with status:', res.status);
         return false;
       }
     } catch (e) {
@@ -86,7 +94,7 @@ export function useMonthStatus(month: string, accessToken?: string) {
       setError('Error locking month');
       return false;
     }
-  }, [month, accessToken]);
+  }, [month, accessToken, fetchStatus]);
 
   // Auto-fetch on mount or when month/token changes
   useEffect(() => {
