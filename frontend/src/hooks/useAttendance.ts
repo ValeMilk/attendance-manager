@@ -87,22 +87,20 @@ export function useAttendance() {
 
   const employeesQueryString = useMemo(() => {
     const params = new URLSearchParams();
-    if (currentUserRole === 'expectador') {
-      params.set('changedOnly', 'true');
-      if (periodStart) params.set('startDay', periodStart);
-      if (periodEnd) params.set('endDay', periodEnd);
-      if (selectedSupervisor !== 'all') {
-        params.set('supervisorUserId', String(selectedSupervisor));
-      }
-    } else if (selectedSupervisor !== 'all') {
+    if (selectedSupervisor !== 'all') {
       params.set('supervisorUserId', String(selectedSupervisor));
     }
     const query = params.toString();
     return query ? `?${query}` : '';
-  }, [currentUserRole, selectedSupervisor, periodStart, periodEnd]);
+  }, [selectedSupervisor]);
+
+  const isSupervisorRole = (role: string) =>
+    String(role || '').toLowerCase() === 'supervisor';
 
   const filteredEmployees = useMemo(() => {
-    return dedupeById(employeesState);
+    return dedupeById(employeesState).filter(
+      (e: any) => !isSupervisorRole(e.role)
+    );
   }, [employeesState]);
 
   const currentSupervisor = useMemo(() => {
@@ -146,7 +144,9 @@ export function useAttendance() {
           if (empRes.ok) {
             const emps = await empRes.json();
             if (mounted && Array.isArray(emps)) {
-              const mapped = emps.map((e: any) => ({ id: e.id || `${e.supervisorId}-${e.slug}`, name: e.name || e.displayName || e.slug, role: e.role || 'FUNCIONÁRIO', supervisorId: e.supervisorId }));
+              const mapped = emps
+                .filter((e: any) => String(e.role || '').toLowerCase() !== 'supervisor')
+                .map((e: any) => ({ id: e.id || `${e.supervisorId}-${e.slug}`, name: e.name || e.displayName || e.slug, role: e.role || 'FUNCIONÁRIO', supervisorId: e.supervisorId }));
               setEmployeesState(dedupeById(mapped));
               employeesLoadedFromApi = true;
             }
@@ -161,6 +161,7 @@ export function useAttendance() {
           const supId = (u.supervisorId || u._id || u.id).toString();
           const emps = Array.isArray(u.employees) ? u.employees : [];
           emps.forEach((e: any, idx: number) => {
+            if (String(e.role || '').toLowerCase() === 'supervisor') return;
             const name = e.name || e.employeeName || (`employee-${idx}`);
             const id = `${supId}-${slug(name)}`;
             derivedEmployees.push({ id, name, role: e.role || 'FUNCIONÁRIO', supervisorId: supId });

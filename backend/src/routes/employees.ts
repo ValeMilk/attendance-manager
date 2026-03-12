@@ -180,7 +180,7 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
             const result = subSupervisors.map((s: any) => ({
               id: `${managerSupId}-${slugify(String(s.name || ''))}`,
               name: slugify(String(s.name || '')),
-              role: 'SUPERVISOR',
+              role: 'LIDER DE EQUIPE',
               supervisorId: String((s as any).supervisorId || managerSupId),
             }));
             return res.json(result);
