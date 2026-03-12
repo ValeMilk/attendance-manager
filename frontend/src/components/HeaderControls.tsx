@@ -18,6 +18,9 @@ interface HeaderControlsProps {
   onRoleChange: (role: 'admin' | 'supervisor' | 'expectador') => void;
   onClearAll: () => void;
   onRefresh?: () => void;
+  isMonthLocked?: boolean;
+  onToggleMonthLock?: (unlock: boolean) => Promise<boolean>;
+  monthLockLoading?: boolean;
 }
 
 export function HeaderControls({
@@ -30,6 +33,9 @@ export function HeaderControls({
   onRoleChange,
   onClearAll,
   onRefresh,
+  isMonthLocked = true,
+  onToggleMonthLock,
+  monthLockLoading = false,
 }: HeaderControlsProps) {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
@@ -141,6 +147,22 @@ export function HeaderControls({
 
         {/* ações de limpar e avançar foram removidas — navegue com as setas */}
         <div className="flex items-center gap-2">
+          {currentUserRole === 'admin' && onToggleMonthLock && (
+            <Button
+              variant={isMonthLocked ? 'destructive' : 'default'}
+              size="sm"
+              onClick={async () => {
+                const success = await onToggleMonthLock(!isMonthLocked);
+                if (success) {
+                  const action = isMonthLocked ? 'liberado' : 'bloqueado';
+                  alert(`Mês ${action} com sucesso!`);
+                }
+              }}
+              disabled={monthLockLoading}
+            >
+              {monthLockLoading ? '...' : isMonthLocked ? '🔒 Liberar Mês' : '🔓 Bloquear Mês'}
+            </Button>
+          )}
           {onRefresh && (
             <Button
               variant="outline"

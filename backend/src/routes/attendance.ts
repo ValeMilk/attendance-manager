@@ -4,11 +4,21 @@ import { AttendanceRecord } from '../models/AttendanceRecord.js';
 import { Justification } from '../models/Justification.js';
 import { User } from '../models/User.js';
 import { Employee } from '../models/Employee.js';
+import { MonthStatus } from '../models/MonthStatus.js';
 import { Types } from 'mongoose';
 
 // simple slug helper
 function slugify(s: string) {
   return String(s || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+}
+
+// Extract month from ISO date (YYYY-MM-DD -> YYYY-MM)
+function getMonthFromDay(day: string): string {
+  const parts = String(day || '').split('-');
+  if (parts.length >= 2) {
+    return `${parts[0]}-${parts[1]}`;
+  }
+  return '';
 }
 
 function inferSupervisorIdFromEmployeeId(employeeId: string, knownSupervisorIds: string[]) {
@@ -41,6 +51,21 @@ router.post('/', authenticateJWT, async (req: AuthRequest, res) => {
 
     const records: any[] = req.body.records || [];
     if (!Array.isArray(records)) return res.status(400).json({ message: 'Invalid payload' });
+
+    // Check if any record's month is locked (for supervisors only)
+    if (role === 'supervisor' && records.length > 0) {
+      const months = new Set(records.map(r => getMonthFromDay(String(r.day || ''))).filter(Boolean));
+      for (const month of months) {
+        const status = await MonthStatus.findOne({ month }).lean();
+        if (status?.isLocked) {
+          return res.status(403).json({
+            message: `Month ${month} is locked. Admin must unlock it first.`,
+            month,
+            locked: true,
+          });
+        }
+      }
+    }
 
     const knownSupervisorIds = (
       await User.find({ role: 'supervisor' }).select('supervisorId').lean()
@@ -204,6 +229,22 @@ router.post('/justifications', authenticateJWT, async (req: AuthRequest, res) =>
 
     const { justifications } = req.body;
     if (!Array.isArray(justifications)) return res.status(400).json({ message: 'Invalid payload' });
+
+    // Check if any justification's month is locked (for supervisors only)
+    if (role === 'supervisor' && justifications.length > 0) {
+      const months = new Set(justifications.map(j => getMonthFromDay(String(j.day || ''))).filter(Boolean));
+      for (const month of months) {
+        const status = await MonthStatus.findOne({ month }).lean();
+        if (status?.isLocked) {
+          return res.status(403).json({
+            message: `Month ${month} is locked. Admin must unlock it first.`,
+            month,
+            locked: true,
+          });
+        }
+      }
+    }
+
     for (const j of justifications) {
       // Extract supervisorId from employeeId prefix (e.g., "mariana-moura-max" -> "mariana-moura")
       const supervisorIdFromEmployee = j.employeeId?.split('-').slice(0, -1).join('-') || null;
@@ -273,6 +314,21 @@ router.delete('/justifications', authenticateJWT, async (req: AuthRequest, res) 
     } else {
       target = await Justification.findOne({ employeeId: String(employeeId), day: String(day) }).lean();
       if (!target) return res.json({ ok: true, deleted: false });
+    }
+
+    // Check if month is locked (for supervisors only)
+    if (role === 'supervisor') {
+      const month = getMonthFromDay(String(target.day || ''));
+      if (month) {
+        const status = await MonthStatus.findOne({ month }).lean();
+        if (status?.isLocked) {
+          return res.status(403).json({
+            message: `Month ${month} is locked. Admin must unlock it first.`,
+            month,
+            locked: true,
+          });
+        }
+      }
     }
 
     if (role === 'supervisor') {

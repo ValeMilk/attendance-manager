@@ -15,6 +15,7 @@ interface AttendanceTableProps {
   storeName?: string;
   periodLabel: string;
   onSave?: () => Promise<boolean>;
+  isMonthLocked?: boolean;
 }
 
 export function AttendanceTable({
@@ -28,10 +29,12 @@ export function AttendanceTable({
   storeName,
   periodLabel,
   onSave,
+  isMonthLocked = false,
 }: AttendanceTableProps) {
   const [bulkCodeByDay, setBulkCodeByDay] = useState<Record<string, string>>({});
   const isAdmin = currentUserRole === 'admin';
   const isSupervisor = currentUserRole === 'supervisor';
+  const isEditDisabled = isSupervisor && isMonthLocked;
   // calcular largura mínima da tabela dinamicamente: larguras fixas das colunas iniciais + colunas de dias
   const fixedColsWidth = 220 + 100 + 40; // largura aproximada das 3 colunas fixas (FUNC, FUNÇÃO, APT/SUP)
   const dayColWidth = 36; // largura por dia (inclui padding/margem)
@@ -86,6 +89,13 @@ export function AttendanceTable({
   return (
     <div style={{ overflowX: 'auto', width: '100%' }}>
       <div style={{ minWidth: `${tableMinWidth}px` }}>
+        {/* Month Lock Warning */}
+        {isEditDisabled && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+            <span className="font-semibold">🔒 Mês Bloqueado</span> - Este mês foi bloqueado pelo administrador. Você pode apenas visualizar os dados. Para fazer alterações, aguarde a liberação do administrador.
+          </div>
+        )}
+
         {/* Header with store and period info */}
         <div className="flex items-center justify-between mb-4 px-2">
           <div>
@@ -97,7 +107,7 @@ export function AttendanceTable({
           <div className="text-right">
             <h3 className="text-base font-semibold text-foreground">PLANILHA DE APONTAMENTO DE PRESENÇA</h3>
             <p className="text-sm text-primary font-medium">{periodLabel}</p>
-            {onSave && currentUserRole !== 'expectador' && (
+            {onSave && currentUserRole !== 'expectador' && !isEditDisabled && (
               <div className="mt-2 flex justify-end">
                 <button
                   onClick={async () => {
@@ -202,6 +212,7 @@ export function AttendanceTable({
                             onApontadorChange={(value) => updateRecord(employee.id, dayInfo.day, 'apontador', value)}
                             onSupervisorChange={(value) => updateRecord(employee.id, dayInfo.day, 'supervisor', value)}
                             currentUserRole={currentUserRole}
+                            isDisabled={isEditDisabled}
                           />
                         </td>
                       );

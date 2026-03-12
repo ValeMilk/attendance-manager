@@ -9,6 +9,7 @@ interface AttendanceCellProps {
   onApontadorChange: (value: AttendanceCode) => void;
   onSupervisorChange: (value: AttendanceCode) => void;
   currentUserRole: 'admin' | 'supervisor' | 'expectador';
+  isDisabled?: boolean;
 }
 
 function getCellClass(value: AttendanceCode, dayInfo: DayInfo): string {
@@ -41,9 +42,10 @@ export function AttendanceCell({
   onApontadorChange,
   onSupervisorChange,
   currentUserRole,
+  isDisabled = false,
 }: AttendanceCellProps) {
   // Apenas domingos continuam automáticos/bloqueados. Feriados agora são opcionais (marcados pelo botão).
-  const isBlocked = dayInfo.isSunday;
+  const isBlocked = dayInfo.isSunday || isDisabled;
   const displayLabel = dayInfo.isSunday ? 'DOM' : '';
 
   if (isBlocked) {

@@ -1,4 +1,5 @@
 import { useAttendance, usePersistCurrentDate } from '@/hooks/useAttendance';
+import { useMonthStatus } from '@/hooks/useMonthStatus';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Login } from '@/components/Login';
 import { UserManagement } from '@/components/UserManagement';
@@ -11,6 +12,7 @@ import { ptBR } from 'date-fns/locale';
 import { useEffect } from 'react';
 
 const Index = () => {
+  const { accessToken, user } = useAuth();
   const {
     currentDate,
     setCurrentDate,
@@ -32,6 +34,10 @@ const Index = () => {
     saveAll,
     refreshData,
   } = useAttendance();
+
+  // Extract month in YYYY-MM format from currentDate
+  const currentMonth = format(currentDate, 'yyyy-MM');
+  const { isLocked: isMonthLocked, unlockMonth, lockMonth, monthLockLoading } = useMonthStatus(currentMonth, accessToken);
 
   // sync auth user role into attendance hook
   const AuthSync = () => {
@@ -101,6 +107,11 @@ const Index = () => {
           onRoleChange={setCurrentUserRole}
           onClearAll={clearAll}
           onRefresh={refreshData}
+          isMonthLocked={isMonthLocked}
+          onToggleMonthLock={async (unlock: boolean) => {
+            return unlock ? await unlockMonth() : await lockMonth();
+          }}
+          monthLockLoading={monthLockLoading}
         />
 
         <AttendanceTable
@@ -114,6 +125,7 @@ const Index = () => {
           storeName={currentSupervisor?.store}
           periodLabel={periodLabel}
           onSave={saveAll}
+          isMonthLocked={isMonthLocked}
         />
 
         <JustificationsSection
