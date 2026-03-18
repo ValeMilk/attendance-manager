@@ -42,7 +42,7 @@ function buildLoginCandidates(identifier: string): string[] {
 }
 
 // Register
-router.post('/register', async (req: AuthRequest, res: Response) => {
+router.post('/register', authenticateJWT, async (req: AuthRequest, res: Response) => {
   try {
     const { name, email, password, role } = req.body;
 
