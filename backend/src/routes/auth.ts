@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { User } from '../models/User.js';
 import { RefreshToken } from '../models/RefreshToken.js';
 import { authenticateJWT, AuthRequest } from '../middleware/auth.js';
@@ -257,6 +258,89 @@ router.post('/debug/reset-passwords', async (req: AuthRequest, res: Response) =>
     res.json({ message: 'Passwords reset successfully', results });
   } catch (error) {
     res.status(500).json({ message: 'Failed to reset passwords', error });
+  }
+});
+
+// TEMPORARY DEBUG: Populate employees from CSV
+router.post('/debug/populate-employees', async (req: AuthRequest, res: Response) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Ler CSV
+    const csvPath = path.join(process.cwd(), '../', 'frontend', 'public', 'Pasta1.csv');
+    if (!fs.existsSync(csvPath)) {
+      return res.status(404).json({ message: 'CSV file not found at ' + csvPath });
+    }
+
+    const csvContent = fs.readFileSync(csvPath, 'utf-8');
+    const lines = csvContent.split('\n').slice(1); // Skip header
+
+    // Map supervisors
+    const supervisors = await User.find({ role: 'supervisor' });
+    const supervisorMap: Record<string, string> = {};
+    supervisors.forEach(s => {
+      supervisorMap[s.name.toUpperCase()] = s._id.toString();
+    });
+
+    console.log(`Found ${Object.keys(supervisorMap).length} supervisors`);
+
+    // Create employees collection if not exists
+    const employeeSchema = new mongoose.Schema({
+      name: String,
+      role: String,
+      supervisorUserId: mongoose.Schema.Types.ObjectId,
+      department: String,
+      isActive: Boolean,
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now }
+    });
+
+    const Employee = mongoose.model('Employee', employeeSchema, 'employees');
+
+    // Delete existing
+    const deleteResult = await (Employee.collection as any).deleteMany({});
+
+    // Parse and add employees
+    let created = 0;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+
+      const parts = line.split(';');
+      if (parts.length < 2) continue;
+
+      const supervisorName = (parts[0] || '').trim().toUpperCase();
+      const employeeName = (parts[1] || '').trim();
+      const role = (parts[2] || 'FUNCIONÁRIO').trim();
+
+      const supervisorId = supervisorMap[supervisorName];
+      if (!supervisorId) continue;
+
+      try {
+        await Employee.create({
+          name: employeeName,
+          role: role,
+          supervisorUserId: supervisorId,
+          isActive: true,
+          department: supervisorName
+        });
+        created++;
+      } catch (e) {
+        console.error('Error creating employee:', e);
+      }
+    }
+
+    const total = await (Employee.collection as any).countDocuments();
+
+    res.json({
+      message: 'Employees populated successfully',
+      created,
+      total,
+      supervisorMapSize: Object.keys(supervisorMap).length
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Failed to populate employees', error });
   }
 });
 
