@@ -267,10 +267,28 @@ router.post('/debug/populate-employees', async (req: AuthRequest, res: Response)
     const fs = require('fs');
     const path = require('path');
     
-    // Ler CSV
-    const csvPath = path.join(process.cwd(), '../', 'frontend', 'public', 'Pasta1.csv');
-    if (!fs.existsSync(csvPath)) {
-      return res.status(404).json({ message: 'CSV file not found at ' + csvPath });
+    // Ler CSV - tentar múltiplos caminhos
+    let csvPath = '';
+    const possiblePaths = [
+      '/app/public/Pasta1.csv',
+      '/opt/attendance-manager/frontend/public/Pasta1.csv',
+      path.join(process.cwd(), '../', 'frontend', 'public', 'Pasta1.csv'),
+      path.join(process.cwd(), '../../frontend/public/Pasta1.csv'),
+    ];
+    
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        csvPath = p;
+        break;
+      }
+    }
+    
+    if (!csvPath) {
+      return res.status(404).json({ 
+        message: 'CSV file not found',
+        cwd: process.cwd(),
+        tried: possiblePaths 
+      });
     }
 
     const csvContent = fs.readFileSync(csvPath, 'utf-8');
