@@ -231,4 +231,37 @@ router.get('/profile', authenticateJWT, async (req: AuthRequest, res: Response) 
   }
 });
 
+// TEMPORARY: Reset supervisor passwords
+router.post('/admin/reset-supervisor-passwords', authenticateJWT, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admins can reset passwords' });
+    }
+
+    const updates = [
+      { email: 'paulinho-de-paula@attendance.com', password: 'paulinho123' },
+      { email: 'mariana-moura@attendance.com', password: 'mariana123' },
+      { email: 'jose-furtado@attendance.com', password: 'jose123' },
+      { email: 'paulo-oliveira@attendance.com', password: 'paulo123' }
+    ];
+
+    const results = [];
+    for (const update of updates) {
+      const hashedPassword = await bcryptjs.hash(update.password, 10);
+      const result = await User.findOneAndUpdate(
+        { email: update.email },
+        { password: hashedPassword },
+        { new: true }
+      );
+      if (result) {
+        results.push({ email: result.email, name: result.name, password: update.password });
+      }
+    }
+
+    res.json({ message: 'Passwords reset successfully', results });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to reset passwords', error });
+  }
+});
+
 export default router;
