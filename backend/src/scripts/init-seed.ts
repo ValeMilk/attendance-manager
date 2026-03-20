@@ -65,7 +65,9 @@ async function seedEmployees() {
     const supervisors = await User.find({ role: 'supervisor' });
     const supervisorMap: Record<string, string> = {};
     supervisors.forEach(s => {
-      supervisorMap[s.name.toUpperCase()] = s._id.toString();
+      if (s.name) {
+        supervisorMap[s.name.toUpperCase()] = s._id.toString();
+      }
     });
 
     console.log(`✓ Found ${supervisors.length} supervisors`);
