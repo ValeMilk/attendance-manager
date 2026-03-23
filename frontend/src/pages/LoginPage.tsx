@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const USERS = [
   { label: 'Admin', value: 'admin' },
-  { label: 'Rodney', value: 'rodney' },
+  { label: 'Rodney (Gerente)', value: 'rodney' },
   { label: 'Mariana Moura', value: 'mariana moura' },
   { label: 'Jose Furtado', value: 'jose furtado' },
   { label: 'Paulo Oliveira', value: 'paulo oliveira' },

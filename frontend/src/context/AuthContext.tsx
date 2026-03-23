@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 interface User {
   id: string;
   username: string;
-  role: 'admin' | 'supervisor' | 'expectador';
+  role: 'admin' | 'gerente' | 'supervisor' | 'expectador';
 }
 
 interface AuthContextValue {

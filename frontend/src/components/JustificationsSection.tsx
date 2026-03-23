@@ -12,7 +12,7 @@ interface JustificationsSectionProps {
   daysInMonth: DayInfo[];
   onAdd: (employeeId: string, day: string, text: string, applyToSupervisor?: boolean, supervisorCode?: string) => void;
   onRemove: (id: string) => void;
-  currentUserRole?: 'admin' | 'supervisor' | 'expectador';
+  currentUserRole?: 'admin' | 'gerente' | 'supervisor' | 'expectador';
 }
 
 export function JustificationsSection({

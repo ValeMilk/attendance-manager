@@ -52,8 +52,8 @@ router.post('/', authenticateJWT, async (req: AuthRequest, res) => {
     const records: any[] = req.body.records || [];
     if (!Array.isArray(records)) return res.status(400).json({ message: 'Invalid payload' });
 
-    // Check if any record's month is locked (for supervisors only)
-    if (role === 'supervisor' && records.length > 0) {
+    // Check if any record's month is locked (for supervisors and gerentes)
+    if ((role === 'supervisor' || role === 'gerente') && records.length > 0) {
       const months = new Set(records.map(r => getMonthFromDay(String(r.day || ''))).filter(Boolean));
       for (const month of months) {
         const status = await MonthStatus.findOne({ month }).lean();
@@ -162,7 +162,7 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
     };
     const isChanged = (r: any) => String(r?.apontador || '').trim() !== '' || String(r?.supervisor || '').trim() !== '';
 
-    if (role === 'supervisor') {
+    if (role === 'supervisor' || role === 'gerente') {
       // Phase 2: Use index { supervisorId: 1, day: 1 } instead of full table scan
       const user = await User.findById(req.userId).lean();
       if (!user) return res.status(404).json({ message: 'User not found' });
@@ -230,8 +230,8 @@ router.post('/justifications', authenticateJWT, async (req: AuthRequest, res) =>
     const { justifications } = req.body;
     if (!Array.isArray(justifications)) return res.status(400).json({ message: 'Invalid payload' });
 
-    // Check if any justification's month is locked (for supervisors only)
-    if (role === 'supervisor' && justifications.length > 0) {
+    // Check if any justification's month is locked (for supervisors and gerentes)
+    if ((role === 'supervisor' || role === 'gerente') && justifications.length > 0) {
       const months = new Set(justifications.map(j => getMonthFromDay(String(j.day || ''))).filter(Boolean));
       for (const month of months) {
         const status = await MonthStatus.findOne({ month }).lean();
@@ -273,7 +273,7 @@ router.get('/justifications', authenticateJWT, async (req: AuthRequest, res) => 
   try {
     const { supervisorId } = req.query;
     const role = req.user?.role;
-    if (role === 'supervisor') {
+    if (role === 'supervisor' || role === 'gerente') {
       const user = await User.findById(req.userId).lean();
       if (!user) return res.status(404).json({ message: 'User not found' });
       // Use denormalized supervisorId field for O(log n + k) index lookup instead of O(n) regex
@@ -318,8 +318,8 @@ router.delete('/justifications', authenticateJWT, async (req: AuthRequest, res) 
     }
     if (!target) return res.json({ ok: true, deleted: false });
 
-    // Check if month is locked (for supervisors only)
-    if (role === 'supervisor') {
+    // Check if month is locked (for supervisors and gerentes)
+    if (role === 'supervisor' || role === 'gerente') {
       const month = getMonthFromDay(String(target.day || ''));
       if (month) {
         const status = await MonthStatus.findOne({ month }).lean();
@@ -333,7 +333,7 @@ router.delete('/justifications', authenticateJWT, async (req: AuthRequest, res) 
       }
     }
 
-    if (role === 'supervisor') {
+    if (role === 'supervisor' || role === 'gerente') {
       const user = await User.findById(req.userId).select('supervisorId').lean();
       if (!user) return res.status(404).json({ message: 'User not found' });
       const supPrefix = String((user as any).supervisorId || '');
@@ -363,7 +363,7 @@ router.get('/debug-scope', authenticateJWT, async (req: AuthRequest, res) => {
     let employeesQuery: any = {};
     let attendance: any[] = [];
 
-    if (role === 'supervisor') {
+    if (role === 'supervisor' || role === 'gerente') {
       employeesQuery = { supervisorId: { $in: [me.supervisorId, 'global'] } };
       const all = await AttendanceRecord.find({}).lean();
       const prefix = me._id.toString();

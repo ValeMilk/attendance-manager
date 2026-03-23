@@ -14,8 +14,8 @@ interface HeaderControlsProps {
   selectedSupervisor: string | 'all';
   onSupervisorChange: (value: string | 'all') => void;
   supervisors: Supervisor[];
-  currentUserRole: 'admin' | 'supervisor' | 'expectador';
-  onRoleChange: (role: 'admin' | 'supervisor' | 'expectador') => void;
+  currentUserRole: 'admin' | 'gerente' | 'supervisor' | 'expectador';
+  onRoleChange: (role: 'admin' | 'gerente' | 'supervisor' | 'expectador') => void;
   onClearAll: () => void;
   onRefresh?: () => void;
   isMonthLocked?: boolean;
@@ -77,6 +77,16 @@ export function HeaderControls({
             >
               <Shield className="w-4 h-4" />
               Admin (Apontador)
+            </Button>
+            <Button
+              variant={currentUserRole === 'gerente' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => onRoleChange('gerente')}
+              disabled={isRoleLocked && user?.role !== 'gerente'}
+              className="gap-2"
+            >
+              <Users className="w-4 h-4" />
+              Gerente
             </Button>
             <Button
               variant={currentUserRole === 'supervisor' ? 'default' : 'ghost'}

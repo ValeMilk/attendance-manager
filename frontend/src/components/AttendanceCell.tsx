@@ -8,7 +8,7 @@ interface AttendanceCellProps {
   supervisorValue: AttendanceCode;
   onApontadorChange: (value: AttendanceCode) => void;
   onSupervisorChange: (value: AttendanceCode) => void;
-  currentUserRole: 'admin' | 'supervisor' | 'expectador';
+  currentUserRole: 'admin' | 'gerente' | 'supervisor' | 'expectador';
   isDisabled?: boolean;
 }
 

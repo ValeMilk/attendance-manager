@@ -102,10 +102,10 @@ async function seed() {
 
     console.log(`\nParsed ${Object.keys(supervisorData).length} supervisors from CSV:`);
 
-    // Adicionar Rodney como supervisor (gerente dos supervisores)
+    // Adicionar Rodney como gerente (gerente dos supervisores)
     const rodneyExists = await User.findOne({
       username: 'rodney',
-      role: 'supervisor',
+      role: 'gerente',
     });
 
     if (!rodneyExists) {
@@ -114,7 +114,7 @@ async function seed() {
         name: 'RODNEY',
         username: 'rodney',
         password: rodneyPwd,
-        role: 'supervisor',
+        role: 'gerente',
         supervisorId: 'rodney',
         isActive: true,
         employees: [], // Rodney é gerente dos supervisores, sem funcionários próprios
@@ -165,7 +165,7 @@ async function seed() {
     // Atualizar Rodney com a lista de supervisores como employees
     if (rodneyEmployees.length > 0) {
       await User.updateOne(
-        { username: 'rodney', role: 'supervisor' },
+        { username: 'rodney', role: 'gerente' },
         { $set: { employees: rodneyEmployees } }
       );
       console.log(`  ✓ Rodney atualizado com ${rodneyEmployees.length} supervisores como equipe`);

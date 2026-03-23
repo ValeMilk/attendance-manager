@@ -46,7 +46,7 @@ export default function AdminUsers() {
   const [localEmployees, setLocalEmployees] = useState<EmployeeItem[]>([]);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
+    if (!user || (user.role !== 'admin' && user.role !== 'gerente')) {
       navigate('/');
       return;
     }
@@ -206,7 +206,7 @@ export default function AdminUsers() {
   }
 
   const roleLabel = (r: string) =>
-    r === 'admin' ? '🔑 Admin' : r === 'supervisor' ? '👷 Supervisor' : '👁 Expectador';
+    r === 'admin' ? '🔑 Admin' : r === 'gerente' ? '💼 Gerente' : r === 'supervisor' ? '👷 Supervisor' : '👁 Expectador';
 
   return (
     <div className="min-h-screen bg-background">
@@ -267,6 +267,7 @@ export default function AdminUsers() {
               className="border border-border rounded-lg px-3 py-2 bg-background text-sm"
             >
               <option value="admin">Admin</option>
+              <option value="gerente">Gerente</option>
               <option value="supervisor">Supervisor</option>
               <option value="expectador">Expectador</option>
             </select>
@@ -389,6 +390,7 @@ export default function AdminUsers() {
                   className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm mt-1"
                 >
                   <option value="admin">Admin</option>
+                  <option value="gerente">Gerente</option>
                   <option value="supervisor">Supervisor</option>
                   <option value="expectador">Expectador</option>
                 </select>

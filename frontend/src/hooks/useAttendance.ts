@@ -14,7 +14,7 @@ export function useAttendance() {
     }
   }); // Janeiro 2026
   const [selectedSupervisor, setSelectedSupervisor] = useState<string | 'all'>('all');
-  const [currentUserRole, setCurrentUserRole] = useState<'admin' | 'supervisor' | 'expectador'>('admin');
+  const [currentUserRole, setCurrentUserRole] = useState<'admin' | 'gerente' | 'supervisor' | 'expectador'>('admin');
   const [supervisorsState, setSupervisorsState] = useState(() => [] as any[]);
   const [employeesState, setEmployeesState] = useState(() => [] as any[]);
   const [refreshTick, setRefreshTick] = useState(0);

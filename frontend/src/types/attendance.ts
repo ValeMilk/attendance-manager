@@ -1,6 +1,6 @@
 export type AttendanceCode = 'P' | 'F' | 'FT' | 'FM' | 'AT' | 'ABF' | 'ABT' | 'DOM' | 'FER' | 'FERI' | 'FOLGA' | '';
 
-export type UserRole = 'admin' | 'supervisor' | 'expectador';
+export type UserRole = 'admin' | 'gerente' | 'supervisor' | 'expectador';
 
 export interface Employee {
   id: string;

@@ -6,8 +6,8 @@ import bcryptjs from 'bcryptjs';
 
 const router = Router();
 
-// List users (admin only)
-router.get('/', authenticateJWT, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+// List users (admin and gerente)
+router.get('/', authenticateJWT, requireRole(['admin', 'gerente']), async (req: AuthRequest, res: Response) => {
   try {
     const users = await User.find().select('-password');
     res.json(users);
@@ -17,15 +17,15 @@ router.get('/', authenticateJWT, requireRole(['admin']), async (req: AuthRequest
   }
 });
 
-// Update user (admin only)
-router.put('/:id', authenticateJWT, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+// Update user (admin and gerente)
+router.put('/:id', authenticateJWT, requireRole(['admin', 'gerente']), async (req: AuthRequest, res: Response) => {
   try {
     const { name, username, role, isActive, password, employees } = req.body;
     const update: any = {};
 
     if (name !== undefined) update.name = String(name).trim();
     if (username !== undefined) update.username = String(username).trim().toLowerCase();
-    if (role !== undefined && ['admin', 'supervisor', 'expectador'].includes(role)) update.role = role;
+    if (role !== undefined && ['admin', 'gerente', 'supervisor', 'expectador'].includes(role)) update.role = role;
     if (isActive !== undefined) update.isActive = Boolean(isActive);
     if (employees !== undefined) update.employees = employees;
     if (password && String(password).trim().length >= 6) {
@@ -42,8 +42,8 @@ router.put('/:id', authenticateJWT, requireRole(['admin']), async (req: AuthRequ
   }
 });
 
-// Delete user (admin only)
-router.delete('/:id', authenticateJWT, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+// Delete user (admin and gerente)
+router.delete('/:id', authenticateJWT, requireRole(['admin', 'gerente']), async (req: AuthRequest, res: Response) => {
   try {
     // Prevent admin from deleting themselves
     if (req.params.id === req.userId) {

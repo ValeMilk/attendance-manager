@@ -45,9 +45,9 @@ const Index = () => {
     useEffect(() => {
       if (user) {
         if (currentUserRole !== user.role) {
-          setCurrentUserRole(user.role as 'admin' | 'supervisor' | 'expectador');
+          setCurrentUserRole(user.role as 'admin' | 'gerente' | 'supervisor' | 'expectador');
         }
-        if (user.role === 'supervisor') {
+        if (user.role === 'supervisor' || user.role === 'gerente') {
           // auto-select the supervisor id associated with the logged user so the UI
           // filters employees and shows the correct view for that supervisor
           const supId = (user as any).supervisorId || (user as any).id || 'all';
@@ -66,7 +66,7 @@ const Index = () => {
 
   // Auto-select first supervisor when switching to supervisor/expectador role
   useEffect(() => {
-    if ((currentUserRole === 'supervisor' || currentUserRole === 'expectador') && selectedSupervisor === 'all') {
+    if ((currentUserRole === 'supervisor' || currentUserRole === 'gerente' || currentUserRole === 'expectador') && selectedSupervisor === 'all') {
       setSelectedSupervisor(supervisors[0]?.id || 'all');
     }
   }, [currentUserRole, selectedSupervisor, supervisors, setSelectedSupervisor]);
@@ -87,7 +87,7 @@ const Index = () => {
             <p className="text-sm text-primary-foreground/80">Gestão de frequência de funcionários</p>
           </div>
           <div className="flex items-center gap-3">
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || user?.role === 'gerente') && (
               <Link
                 to="/admin/usuarios"
                 className="text-sm bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground px-3 py-1.5 rounded-lg transition-colors font-medium"
@@ -98,7 +98,7 @@ const Index = () => {
             <div className="text-sm bg-primary-foreground/10 px-3 py-1.5 rounded-lg">
               <span className="text-primary-foreground/70">Usuário:</span>{' '}
               <span className="font-semibold">
-                {currentUserRole === 'admin' ? 'Administrador' : currentUserRole === 'expectador' ? 'Expectador' : currentSupervisor?.name || 'Supervisor'}
+                {currentUserRole === 'admin' ? 'Administrador' : currentUserRole === 'gerente' ? 'Gerente' : currentUserRole === 'expectador' ? 'Expectador' : currentSupervisor?.name || 'Supervisor'}
               </span>
             </div>
           </div>
@@ -149,7 +149,7 @@ const Index = () => {
           currentUserRole={currentUserRole}
         />
 
-        {currentUserRole === 'admin' && (
+        {(currentUserRole === 'admin' || currentUserRole === 'gerente') && (
           <DataExport
             employees={filteredEmployees}
             daysInMonth={daysInMonth}

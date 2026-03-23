@@ -150,9 +150,9 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
     const skip = (pageNum - 1) * pageSize;
 
     let supervisorUsers: any[] = [];
-    if (role === 'supervisor') {
+    if (role === 'supervisor' || role === 'gerente') {
       const me = await User.findById(req.userId).select('name supervisorId employees role').lean();
-      if (!me || (me as any).role !== 'supervisor') {
+      if (!me || !['supervisor', 'gerente'].includes((me as any).role)) {
         return res.status(404).json({ message: 'Supervisor not found' });
       }
 

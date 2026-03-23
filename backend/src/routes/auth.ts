@@ -22,7 +22,7 @@ router.post('/register', authenticateJWT, async (req: AuthRequest, res: Response
 
     // Only first user or admin can create new users
     const userCount = await User.countDocuments();
-    if (userCount > 0 && (!req.user || req.user.role !== 'admin')) {
+    if (userCount > 0 && (!req.user || (req.user.role !== 'admin' && req.user.role !== 'gerente'))) {
       return res.status(403).json({ message: 'Only admins can register new users' });
     }
 

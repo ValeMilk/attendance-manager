@@ -10,7 +10,7 @@ interface AttendanceTableProps {
   getRecord: (employeeId: string, day: string) => AttendanceRecord;
   updateRecord: (employeeId: string, day: string, field: 'apontador' | 'supervisor', value: AttendanceCode) => void;
   getTotals: (day: string) => number;
-  currentUserRole: 'admin' | 'supervisor' | 'expectador';
+  currentUserRole: 'admin' | 'gerente' | 'supervisor' | 'expectador';
   supervisorName?: string;
   storeName?: string;
   periodLabel: string;
@@ -33,7 +33,7 @@ export function AttendanceTable({
 }: AttendanceTableProps) {
   const [bulkCodeByDay, setBulkCodeByDay] = useState<Record<string, string>>({});
   const isAdmin = currentUserRole === 'admin';
-  const isSupervisor = currentUserRole === 'supervisor';
+  const isSupervisor = currentUserRole === 'supervisor' || currentUserRole === 'gerente';
   const isEditDisabled = isSupervisor && isMonthLocked;
   // calcular largura mínima da tabela dinamicamente: larguras fixas das colunas iniciais + colunas de dias
   const fixedColsWidth = 220 + 100 + 40; // largura aproximada das 3 colunas fixas (FUNC, FUNÇÃO, APT/SUP)
