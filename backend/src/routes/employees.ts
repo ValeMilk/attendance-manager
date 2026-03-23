@@ -178,14 +178,34 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
         totalPages: Math.ceil(total / pageSize)
       });
     } else {
-      const rosterQuery: any = { role: 'supervisor', isActive: true };
+      const rosterQuery: any = { role: { $in: ['supervisor', 'gerente'] }, isActive: true };
       if (supervisorUserId) {
-        const selected = await User.findOne({ _id: String(supervisorUserId), role: 'supervisor', isActive: true })
-          .select('name supervisorId employees')
+        const selected = await User.findOne({ _id: String(supervisorUserId), role: { $in: ['supervisor', 'gerente'] }, isActive: true })
+          .select('name supervisorId employees role')
           .lean();
 
         if (!selected) {
           supervisorUsers = [];
+        } else if ((selected as any).role === 'gerente') {
+          // Gerente selected: return all supervisors as their employees
+          const allSupervisors = await User.find({ role: 'supervisor', isActive: true })
+            .select('name supervisorId _id').lean();
+          const result = allSupervisors.map((s: any) => ({
+            id: `gerente-${slugify(String(s.name || ''))}`,
+            name: slugify(String(s.name || '')),
+            role: 'SUPERVISOR',
+            supervisorId: 'gerente',
+            supervisorUserId: String(s._id || ''),
+          }));
+          const total = result.length;
+          const paginated = result.slice(skip, skip + pageSize);
+          return res.json({
+            employees: paginated,
+            total,
+            page: pageNum,
+            limit: pageSize,
+            totalPages: Math.ceil(total / pageSize)
+          });
         } else {
           const selectedEmps = Array.isArray((selected as any).employees) ? (selected as any).employees : [];
           const allAreSupervisors =
