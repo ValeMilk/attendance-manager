@@ -150,13 +150,33 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
     const skip = (pageNum - 1) * pageSize;
 
     let supervisorUsers: any[] = [];
-    if (role === 'supervisor' || role === 'gerente') {
+    if (role === 'supervisor') {
       const me = await User.findById(req.userId).select('name supervisorId employees role').lean();
-      if (!me || !['supervisor', 'gerente'].includes((me as any).role)) {
+      if (!me || (me as any).role !== 'supervisor') {
         return res.status(404).json({ message: 'Supervisor not found' });
       }
 
       supervisorUsers = [me];
+    } else if (role === 'gerente') {
+      // Gerente: employees = all supervisors
+      const allSupervisors = await User.find({ role: 'supervisor', isActive: true })
+        .select('name supervisorId _id').lean();
+      const result = allSupervisors.map((s: any) => ({
+        id: `gerente-${slugify(String(s.name || ''))}`,
+        name: slugify(String(s.name || '')),
+        role: 'SUPERVISOR',
+        supervisorId: 'gerente',
+        supervisorUserId: String(s._id || ''),
+      }));
+      const total = result.length;
+      const paginated = result.slice(skip, skip + pageSize);
+      return res.json({
+        employees: paginated,
+        total,
+        page: pageNum,
+        limit: pageSize,
+        totalPages: Math.ceil(total / pageSize)
+      });
     } else {
       const rosterQuery: any = { role: 'supervisor', isActive: true };
       if (supervisorUserId) {

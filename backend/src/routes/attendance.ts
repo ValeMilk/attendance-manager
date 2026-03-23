@@ -162,7 +162,7 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
     };
     const isChanged = (r: any) => String(r?.apontador || '').trim() !== '' || String(r?.supervisor || '').trim() !== '';
 
-    if (role === 'supervisor' || role === 'gerente') {
+    if (role === 'supervisor') {
       // Phase 2: Use index { supervisorId: 1, day: 1 } instead of full table scan
       const user = await User.findById(req.userId).lean();
       if (!user) return res.status(404).json({ message: 'User not found' });
@@ -182,6 +182,19 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
       }
       
       // O(log n + k) with index { supervisorId: 1, day: 1 }
+      let recs = await AttendanceRecord.find(query).lean();
+      if (wantsChangedOnly) recs = recs.filter(r => isChanged(r));
+      return res.json(recs);
+    }
+
+    if (role === 'gerente') {
+      // Gerente sees ALL attendance records (like admin)
+      const query: any = {};
+      if (startDay || endDay) {
+        query.day = {};
+        if (startDay) query.day.$gte = String(startDay);
+        if (endDay) query.day.$lte = String(endDay);
+      }
       let recs = await AttendanceRecord.find(query).lean();
       if (wantsChangedOnly) recs = recs.filter(r => isChanged(r));
       return res.json(recs);
@@ -273,12 +286,17 @@ router.get('/justifications', authenticateJWT, async (req: AuthRequest, res) => 
   try {
     const { supervisorId } = req.query;
     const role = req.user?.role;
-    if (role === 'supervisor' || role === 'gerente') {
+    if (role === 'supervisor') {
       const user = await User.findById(req.userId).lean();
       if (!user) return res.status(404).json({ message: 'User not found' });
       // Use denormalized supervisorId field for O(log n + k) index lookup instead of O(n) regex
       const filtered = await Justification.find({ supervisorId: (user as any).supervisorId || '' }).lean();
       return res.json(filtered);
+    }
+    if (role === 'gerente') {
+      // Gerente sees all justifications
+      const all = await Justification.find({}).lean();
+      return res.json(all);
     }
     if (role === 'admin' || role === 'expectador') {
       if (supervisorId) {
