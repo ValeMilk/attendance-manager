@@ -245,10 +245,11 @@ router.post('/justifications', authenticateJWT, async (req: AuthRequest, res) =>
       }
     }
 
+    const saved: any[] = [];
     for (const j of justifications) {
       // Extract supervisorId from employeeId prefix (e.g., "mariana-moura-max" -> "mariana-moura")
       const supervisorIdFromEmployee = j.employeeId?.split('-').slice(0, -1).join('-') || null;
-      await Justification.findOneAndUpdate(
+      const doc = await Justification.findOneAndUpdate(
         { employeeId: j.employeeId, day: j.day },
         {
           $set: {
@@ -257,10 +258,11 @@ router.post('/justifications', authenticateJWT, async (req: AuthRequest, res) =>
             supervisorId: supervisorIdFromEmployee, // Denormalize supervisorId for fast queries
           },
         },
-        { upsert: true }
+        { upsert: true, new: true }
       );
+      if (doc) saved.push(doc);
     }
-    res.json({ ok: true });
+    res.json({ ok: true, saved });
   } catch (e) {
     console.error('Failed to save justifications', e);
     res.status(500).json({ message: 'Failed to save justifications' });
@@ -308,13 +310,13 @@ router.delete('/justifications', authenticateJWT, async (req: AuthRequest, res) 
     }
 
     let target: any = null;
-    if (id) {
+    if (id && /^[0-9a-fA-F]{24}$/.test(String(id))) {
       target = await Justification.findById(String(id)).lean();
-      if (!target) return res.json({ ok: true, deleted: false });
-    } else {
-      target = await Justification.findOne({ employeeId: String(employeeId), day: String(day) }).lean();
-      if (!target) return res.json({ ok: true, deleted: false });
     }
+    if (!target && employeeId && day) {
+      target = await Justification.findOne({ employeeId: String(employeeId), day: String(day) }).lean();
+    }
+    if (!target) return res.json({ ok: true, deleted: false });
 
     // Check if month is locked (for supervisors only)
     if (role === 'supervisor') {
@@ -340,12 +342,8 @@ router.delete('/justifications', authenticateJWT, async (req: AuthRequest, res) 
       }
     }
 
-    const deleted = id
-      ? await Justification.findByIdAndDelete(String(id))
-      : await Justification.findOneAndDelete({
-          employeeId: String(employeeId),
-          day: String(day),
-        });
+    // Sempre deletar pelo _id real do target encontrado
+    const deleted = await Justification.findByIdAndDelete(target._id);
 
     res.json({ ok: true, deleted: !!deleted });
   } catch (e) {

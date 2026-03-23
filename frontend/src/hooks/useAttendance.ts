@@ -395,6 +395,15 @@ export function useAttendance() {
           const bodyText = await justRes.text().catch(() => '');
           throw new Error(`Autosave justification failed: ${justRes.status} ${bodyText}`);
         }
+
+        // Atualizar ID temporário com o ID real do MongoDB
+        const justData = await justRes.json().catch(() => null);
+        if (justData?.saved?.[0]?._id) {
+          const realId = String(justData.saved[0]._id);
+          setJustifications(prev => prev.map(j =>
+            j.id === newJustification.id ? { ...j, id: realId } : j
+          ));
+        }
       } catch (error) {
         console.error('Autosave from justifications failed. You can still use Save button.', error);
       }
