@@ -8,46 +8,13 @@ import { Response } from 'express';
 
 const router = Router();
 
-const LOGIN_ALIAS_EMAIL: Record<string, string> = {
-  admin: 'admin@attendance.com',
-  mariana: 'mariana-moura@attendance.com',
-  jose: 'jose-furtado@attendance.com',
-  josefurtado: 'jose-furtado@attendance.com',
-  paulo: 'paulo-oliveira@attendance.com',
-  paulinho: 'paulinho-de-paula@attendance.com',
-  rodney: 'rodney-de-macedo@attendance.com',
-  expectador: 'expectador@attendance.com',
-};
-
-function buildLoginCandidates(identifier: string): string[] {
-  const raw = (identifier || '').trim().toLowerCase();
-  if (!raw) {
-    return [];
-  }
-
-  const candidates = new Set<string>();
-  candidates.add(raw);
-
-  const localPart = raw.includes('@') ? raw.split('@')[0] : raw;
-  const canonical = LOGIN_ALIAS_EMAIL[localPart];
-  if (canonical) {
-    candidates.add(canonical);
-  }
-
-  if (!raw.includes('@')) {
-    candidates.add(`${raw}@attendance.com`);
-  }
-
-  return [...candidates];
-}
-
 // Register
 router.post('/register', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, username, password, role } = req.body;
 
     // Check if user exists
-    const existing = await User.findOne({ email });
+    const existing = await User.findOne({ username: username.trim().toLowerCase() });
     if (existing) {
       return res.status(400).json({ message: 'User already exists' });
     }
@@ -61,7 +28,7 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
     const hashedPassword = await bcryptjs.hash(password, 10);
     const user = new User({
       name,
-      email,
+      username: username.trim().toLowerCase(),
       password: hashedPassword,
       role: role || 'expectador',
     });
@@ -80,17 +47,17 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
 // Login
 router.post('/login', async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password } = req.body;
-    const loginCandidates = buildLoginCandidates(email);
-    const users = await User.find({ email: { $in: loginCandidates } });
-    const user = users.find((item) => item.isActive !== false) || users[0] || null;
+    const { username, password } = req.body;
+    const normalizedUsername = (username || '').trim().toLowerCase();
 
-    if (!user) {
+    if (!normalizedUsername) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    if (user.isActive === false) {
-      return res.status(403).json({ message: 'User is inactive. Use your canonical account.' });
+    const user = await User.findOne({ username: normalizedUsername, isActive: true });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     const isMatch = await bcryptjs.compare(password, user.password);
@@ -101,7 +68,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
     const accessToken = jwt.sign(
       {
         userId: user._id.toString(),
-        email: user.email,
+        username: user.username,
         role: user.role,
         supervisorId: user.supervisorId,
       },
@@ -130,7 +97,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email,
+        username: user.username,
         role: user.role,
         supervisorId: user.supervisorId,
       },
@@ -173,7 +140,7 @@ router.post('/refresh', async (req: AuthRequest, res: Response) => {
     const newAccessToken = jwt.sign(
       {
         userId: user._id.toString(),
-        email: user.email,
+        username: user.username,
         role: user.role,
         supervisorId: user.supervisorId,
       },

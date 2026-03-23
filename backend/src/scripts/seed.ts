@@ -68,16 +68,16 @@ async function seed() {
     }
 
     // Create admin
-    const hashedPassword = await bcryptjs.hash('admin123', 10);
+    const hashedPassword = await bcryptjs.hash('admin', 10);
     const admin = new User({
       name: 'Administrador',
-      email: 'admin@attendance.com',
+      username: 'admin',
       password: hashedPassword,
       role: 'admin',
       isActive: true,
     });
     await admin.save();
-    console.log('✓ Admin created: admin@attendance.com / admin123');
+    console.log('✓ Admin created: admin / admin');
 
     // Read and parse CSV
     const csvPath = path.join(process.cwd(), '..', 'frontend', 'public', 'Pasta1.csv');
@@ -95,30 +95,33 @@ async function seed() {
 
     // Adicionar Rodney como supervisor (gerente dos supervisores)
     const rodneyExists = await User.findOne({
-      name: 'RODNEY DE MACEDO',
+      username: 'rodney',
       role: 'supervisor',
     });
 
     if (!rodneyExists) {
-      const rodneyId = 'rodney-de-macedo';
       const rodneyPwd = await bcryptjs.hash('supervisor123', 10);
       const rodney = new User({
-        name: 'RODNEY DE MACEDO',
-        email: `${rodneyId}@attendance.com`,
+        name: 'RODNEY',
+        username: 'rodney',
         password: rodneyPwd,
         role: 'supervisor',
-        supervisorId: rodneyId,
+        supervisorId: 'rodney',
         isActive: true,
         employees: [], // Rodney é gerente dos supervisores, sem funcionários próprios
       });
       await rodney.save();
-      console.log(`  ✓ "RODNEY DE MACEDO" (Gerente - 0 employees)`);
+      console.log(`  ✓ "RODNEY" (Gerente - 0 employees) | login: rodney`);
     }
 
     // Create supervisor users
     for (const supervisorName of Object.keys(supervisorData)) {
+      // Gerar username a partir do nome do supervisor (ex: "MARIANA MOURA" -> "mariana moura")
+      const username = supervisorName.trim().toLowerCase();
+      const supervisorId = supervisorName.toLowerCase().replace(/\s+/g, '-');
+
       const existingSupervisor = await User.findOne({
-        name: supervisorName,
+        username: username,
         role: 'supervisor',
       });
 
@@ -127,12 +130,11 @@ async function seed() {
         continue;
       }
 
-      const supervisorId = supervisorName.toLowerCase().replace(/\s+/g, '-');
       const hashedPwd = await bcryptjs.hash('supervisor123', 10);
 
       const supervisor = new User({
         name: supervisorName,
-        email: `${supervisorId}@attendance.com`,
+        username: username,
         password: hashedPwd,
         role: 'supervisor',
         supervisorId: supervisorId,
@@ -142,7 +144,7 @@ async function seed() {
 
       await supervisor.save();
       console.log(
-        `  ✓ "${supervisorName}" (${supervisorData[supervisorName].employees.length} employees)`
+        `  ✓ "${supervisorName}" (${supervisorData[supervisorName].employees.length} employees) | login: ${username}`
       );
     }
 

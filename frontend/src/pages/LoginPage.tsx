@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,7 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(username, password);
       // redirect to main page after successful login
       navigate('/');
     } catch (err: any) {
@@ -48,15 +48,15 @@ export function LoginPage() {
               )}
 
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium">
-                  Email
+                <label htmlFor="username" className="text-sm font-medium">
+                  Usuário
                 </label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="username"
+                  type="text"
+                  placeholder="seu usuário"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   disabled={loading}
                   required
                 />

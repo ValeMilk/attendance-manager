@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Normalize backend profile -> local User shape
         const normalized: User = {
           id: body._id || body.id || String(body.id || ''),
-          username: body.email || body.name || body.username || '',
+          username: body.username || body.name || '',
           role: body.role || 'expectador',
         };
         setUser(normalized);
@@ -65,11 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [accessToken]);
 
   async function login(username: string, password: string) {
-    const email = username.includes('@') ? username : `${username}@attendance.com`;
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
     if (!res.ok) {
       let message = 'Login failed';
