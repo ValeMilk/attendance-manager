@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import fs from 'fs';
 import dns from 'dns';
 import { Server } from 'http';
 import authRoutes from './routes/auth.js';
@@ -150,7 +151,9 @@ async function main() {
     startHttpServer();
     await connectMongo();
 
-    if (mongoose.connection.readyState !== 1) {
+    if (mongoose.connection.readyState === 1) {
+      console.log('✅ MongoDB conectado. Seed será executado via startup script.');
+    } else {
       console.warn('⚠️ Servidor HTTP ativo sem MongoDB no momento.');
       scheduleMongoReconnect();
     }

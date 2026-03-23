@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { User } from '../models/User.js';
 import { RefreshToken } from '../models/RefreshToken.js';
 import { authenticateJWT, AuthRequest } from '../middleware/auth.js';
@@ -9,7 +10,7 @@ import { Response } from 'express';
 const router = Router();
 
 // Register
-router.post('/register', async (req: AuthRequest, res: Response) => {
+router.post('/register', authenticateJWT, async (req: AuthRequest, res: Response) => {
   try {
     const { name, username, password, role } = req.body;
 
@@ -195,6 +196,278 @@ router.get('/profile', authenticateJWT, async (req: AuthRequest, res: Response) 
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch profile', error });
+  }
+});
+
+// TEMPORARY DEBUG: Reset supervisor passwords (unprotected endpoint)
+router.post('/debug/reset-passwords', async (req: AuthRequest, res: Response) => {
+  try {
+    const updates = [
+      { email: 'paulinho-de-paula@attendance.com', password: 'paulinho123' },
+      { email: 'mariana-moura@attendance.com', password: 'mariana123' },
+      { email: 'jose-furtado@attendance.com', password: 'jose123' },
+      { email: 'paulo-oliveira@attendance.com', password: 'paulo123' }
+    ];
+
+    const results = [];
+    for (const update of updates) {
+      const hashedPassword = await bcryptjs.hash(update.password, 10);
+      const result = await User.findOneAndUpdate(
+        { email: update.email },
+        { password: hashedPassword },
+        { new: true }
+      );
+      if (result) {
+        results.push({ email: result.email, name: result.name, password: update.password });
+      }
+    }
+
+    res.json({ message: 'Passwords reset successfully', results });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to reset passwords', error });
+  }
+});
+
+// TEMPORARY DEBUG: Populate employees from CSV
+router.post('/debug/populate-employees', async (req: AuthRequest, res: Response) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Ler CSV - tentar múltiplos caminhos
+    let csvPath = '';
+    const possiblePaths = [
+      '/app/public/Pasta1.csv',
+      '/opt/attendance-manager/frontend/public/Pasta1.csv',
+      path.join(process.cwd(), '../', 'frontend', 'public', 'Pasta1.csv'),
+      path.join(process.cwd(), '../../frontend/public/Pasta1.csv'),
+    ];
+    
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        csvPath = p;
+        break;
+      }
+    }
+    
+    if (!csvPath) {
+      return res.status(404).json({ 
+        message: 'CSV file not found',
+        cwd: process.cwd(),
+        tried: possiblePaths 
+      });
+    }
+
+    const csvContent = fs.readFileSync(csvPath, 'utf-8');
+    const lines = csvContent.split('\n').slice(1); // Skip header
+
+    // Map supervisors
+    const supervisors = await User.find({ role: 'supervisor' });
+    const supervisorMap: Record<string, string> = {};
+    supervisors.forEach(s => {
+      supervisorMap[s.name.toUpperCase()] = s._id.toString();
+    });
+
+    console.log(`Found ${Object.keys(supervisorMap).length} supervisors`);
+
+    // Create employees collection if not exists
+    const employeeSchema = new mongoose.Schema({
+      name: String,
+      role: String,
+      supervisorUserId: mongoose.Schema.Types.ObjectId,
+      department: String,
+      isActive: Boolean,
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now }
+    });
+
+    const Employee = mongoose.model('Employee', employeeSchema, 'employees');
+
+    // Delete existing
+    const deleteResult = await (Employee.collection as any).deleteMany({});
+
+    // Parse and add employees
+    let created = 0;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+
+      const parts = line.split(';');
+      if (parts.length < 2) continue;
+
+      const supervisorName = (parts[0] || '').trim().toUpperCase();
+      const employeeName = (parts[1] || '').trim();
+      const role = (parts[2] || 'FUNCIONÁRIO').trim();
+
+      const supervisorId = supervisorMap[supervisorName];
+      if (!supervisorId) continue;
+
+      try {
+        await Employee.create({
+          name: employeeName,
+          role: role,
+          supervisorUserId: supervisorId,
+          isActive: true,
+          department: supervisorName
+        });
+        created++;
+      } catch (e) {
+        console.error('Error creating employee:', e);
+      }
+    }
+
+    const total = await (Employee.collection as any).countDocuments();
+
+    res.json({
+      message: 'Employees populated successfully',
+      created,
+      total,
+      supervisorMapSize: Object.keys(supervisorMap).length
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Failed to populate employees', error });
+  }
+});
+
+// TEMPORARY DEBUG: Add employees via JSON POST
+router.post('/debug/add-employees', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employees } = req.body;
+
+    if (!Array.isArray(employees)) {
+      return res.status(400).json({ message: 'Expected array of employees' });
+    }
+
+    // Get supervisors map
+    const supervisors = await User.find({ role: 'supervisor' });
+    const supervisorMap: Record<string, string> = {};
+    supervisors.forEach(s => {
+      supervisorMap[s.name.toUpperCase()] = s._id.toString();
+    });
+
+    // Create employee schema
+    const employeeSchema = new mongoose.Schema({
+      name: String,
+      role: String,
+      supervisorUserId: mongoose.Schema.Types.ObjectId,
+      department: String,
+      isActive: Boolean,
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now }
+    });
+
+    const Employee = mongoose.model('Employee', employeeSchema, 'employees');
+
+    // Delete existing
+    await (Employee.collection as any).deleteMany({});
+
+    // Add employees
+    let created = 0;
+    for (const emp of employees) {
+      const supervisorId = supervisorMap[emp.supervisorName?.toUpperCase()];
+      if (!supervisorId) continue;
+
+      try {
+        await Employee.create({
+          name: emp.name,
+          role: emp.role || 'FUNCIONÁRIO',
+          supervisorUserId: supervisorId,
+          isActive: true,
+          department: emp.supervisorName
+        });
+        created++;
+      } catch (e) {
+        console.error('Error:', e);
+      }
+    }
+
+    const total = await (Employee.collection as any).countDocuments();
+
+    res.json({
+      message: 'Employees added successfully',
+      created,
+      total
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Failed to add employees', error });
+  }
+});
+
+// TEMPORARY: Reset supervisor passwords
+router.post('/admin/reset-supervisor-passwords', authenticateJWT, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admins can reset passwords' });
+    }
+
+    const updates = [
+      { email: 'paulinho-de-paula@attendance.com', password: 'paulinho123' },
+      { email: 'mariana-moura@attendance.com', password: 'mariana123' },
+      { email: 'jose-furtado@attendance.com', password: 'jose123' },
+      { email: 'paulo-oliveira@attendance.com', password: 'paulo123' }
+    ];
+
+    const results = [];
+    for (const update of updates) {
+      const hashedPassword = await bcryptjs.hash(update.password, 10);
+      const result = await User.findOneAndUpdate(
+        { email: update.email },
+        { password: hashedPassword },
+        { new: true }
+      );
+      if (result) {
+        results.push({ email: result.email, name: result.name, password: update.password });
+      }
+    }
+
+    res.json({ message: 'Passwords reset successfully', results });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to reset passwords', error });
+  }
+});
+
+// TEMPORARY DEBUG: Quick populate employees
+router.post('/debug/quick-populate', async (req: AuthRequest, res: Response) => {
+  try {
+    const employeeSchema = new mongoose.Schema({
+      name: String,
+      role: String,
+      supervisorUserId: mongoose.Schema.Types.ObjectId,
+      department: String,
+      isActive: Boolean,
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now }
+    });
+
+    const Employee = mongoose.model('Employee', employeeSchema, 'employees');
+    const supervisors = await User.find({ role: 'supervisor' });
+
+    // Delete existing
+    await Employee.deleteMany({});
+
+    // Create sample employees for each supervisor (3 each)
+    let total = 0;
+    for (const sup of supervisors) {
+      for (let i = 1; i <= 3; i++) {
+        await Employee.create({
+          name: `FUNC${sup._id.toString().slice(-3).toUpperCase()}-${i}`,
+          role: 'PROMOTOR (A)',
+          supervisorUserId: sup._id,
+          department: sup.name,
+          isActive: true
+        });
+        total++;
+      }
+    }
+
+    res.json({
+      message: 'Quick population completed',
+      total,
+      supervisorCount: supervisors.length
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to quick populate', error });
   }
 });
 

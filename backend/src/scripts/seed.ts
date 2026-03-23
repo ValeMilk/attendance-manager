@@ -3,7 +3,11 @@ import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
 import bcryptjs from 'bcryptjs';
+import dotenv from 'dotenv';
 import { User } from '../models/User.js';
+
+// Load environment variables from .env file
+dotenv.config();
 
 // TypeScript interfaces
 interface CSVRow {
