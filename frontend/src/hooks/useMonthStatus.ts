@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect } from 'react';
 export interface MonthStatusData {
   month: string;
   isLocked: boolean;
+  months?: string[];
   unlockedBy?: string;
   unlockedAt?: string;
   lockedAt?: string;
@@ -13,14 +14,14 @@ export function useMonthStatus(month: string, accessToken?: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch month status
+  // Fetch period status (checks both calendar months the period spans)
   const fetchStatus = useCallback(async () => {
     if (!accessToken || !month) return;
     
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/months/${month}`, {
+      const res = await fetch(`/api/months/${month}/period-status`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       
@@ -28,70 +29,62 @@ export function useMonthStatus(month: string, accessToken?: string) {
         const data = await res.json();
         setMonthStatus(data);
       } else {
-        setError('Failed to fetch month status');
+        setError('Failed to fetch period status');
       }
     } catch (e) {
-      console.error('Error fetching month status', e);
-      setError('Error fetching month status');
+      console.error('Error fetching period status', e);
+      setError('Error fetching period status');
     } finally {
       setLoading(false);
     }
   }, [month, accessToken]);
 
-  // Unlock month (admin only)
+  // Unlock period (admin only) - unlocks both calendar months
   const unlockMonth = useCallback(async () => {
     if (!accessToken || !month) return false;
     
     try {
-      const res = await fetch(`/api/months/${month}/unlock`, {
+      const res = await fetch(`/api/months/${month}/unlock-period`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       
       if (res.ok) {
-        const data = await res.json();
-        console.log('🔓 Unlock response:', data);
-        setMonthStatus(data.status);
-        // Refetch after a small delay to ensure backend persistence
+        console.log('🔓 Period unlocked');
         setTimeout(() => fetchStatus(), 100);
         return true;
       } else {
-        setError('Failed to unlock month');
-        console.error('Unlock failed with status:', res.status);
+        setError('Failed to unlock period');
         return false;
       }
     } catch (e) {
-      console.error('Error unlocking month', e);
-      setError('Error unlocking month');
+      console.error('Error unlocking period', e);
+      setError('Error unlocking period');
       return false;
     }
   }, [month, accessToken, fetchStatus]);
 
-  // Lock month (admin only)
+  // Lock period (admin only) - locks both calendar months
   const lockMonth = useCallback(async () => {
     if (!accessToken || !month) return false;
     
     try {
-      const res = await fetch(`/api/months/${month}/lock`, {
+      const res = await fetch(`/api/months/${month}/lock-period`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       
       if (res.ok) {
-        const data = await res.json();
-        console.log('🔒 Lock response:', data);
-        setMonthStatus(data.status);
-        // Refetch after a small delay to ensure backend persistence
+        console.log('🔒 Period locked');
         setTimeout(() => fetchStatus(), 100);
         return true;
       } else {
-        setError('Failed to lock month');
-        console.error('Lock failed with status:', res.status);
+        setError('Failed to lock period');
         return false;
       }
     } catch (e) {
-      console.error('Error locking month', e);
-      setError('Error locking month');
+      console.error('Error locking period', e);
+      setError('Error locking period');
       return false;
     }
   }, [month, accessToken, fetchStatus]);
@@ -110,6 +103,7 @@ export function useMonthStatus(month: string, accessToken?: string) {
     error,
     unlockMonth,
     lockMonth,
+    monthLockLoading: loading,
     refetch: fetchStatus,
   };
 }

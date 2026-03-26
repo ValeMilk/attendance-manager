@@ -173,12 +173,12 @@ export function HeaderControls({
                 const success = await onToggleMonthLock(isMonthLocked);
                 if (success) {
                   const action = isMonthLocked ? 'liberado' : 'bloqueado';
-                  alert(`Mês ${action} com sucesso!`);
+                  alert(`Período ${action} com sucesso!`);
                 }
               }}
               disabled={monthLockLoading}
             >
-              {monthLockLoading ? '...' : isMonthLocked ? '🔒 Liberar Mês' : '🔓 Bloquear Mês'}
+              {monthLockLoading ? '...' : isMonthLocked ? '🔒 Liberar Período' : '🔓 Bloquear Período'}
             </Button>
           )}
           {onRefresh && (
