@@ -233,7 +233,9 @@ export function AttendanceTable({
                 <td colSpan={2} className="px-2 py-2 font-bold text-[11px] text-destructive">
                   TOTAL OCORRÊNCIAS
                 </td>
-                <td />
+                <td className="text-center text-[11px] font-bold text-destructive">
+                  {daysInMonth.reduce((sum, d) => sum + (d.isSunday || d.isHoliday ? 0 : getTotals(d.day)), 0)}
+                </td>
                 {daysInMonth.map((dayInfo) => (
                   <td 
                     key={dayInfo.day} 
