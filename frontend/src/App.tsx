@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import Index from "./pages/Index";
 import { LoginPage } from "./pages/LoginPage";
 import AdminUsers from "./pages/AdminUsers";
+import AuditLogs from "./pages/AuditLogs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <AdminUsers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/logs"
+            element={
+              <ProtectedRoute>
+                <AuditLogs />
               </ProtectedRoute>
             }
           />

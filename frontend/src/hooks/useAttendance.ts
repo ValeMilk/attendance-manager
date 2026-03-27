@@ -443,17 +443,32 @@ export function useAttendance() {
     })();
   }, [justifications, accessToken]);
 
+  const OCORRENCIA_CODES = ['F', 'FT', 'FM', 'AT', 'ABF', 'ABT'];
+
   const getTotals = useCallback((day: string) => {
-    let totalFaltas = 0;
+    let total = 0;
     filteredEmployees.forEach(emp => {
       const record = getRecord(emp.id, day);
       const code = record.supervisor || record.apontador;
-      if (code === 'F' || code === 'FT' || code === 'FM') {
-        totalFaltas++;
+      if (OCORRENCIA_CODES.includes(code)) {
+        total++;
       }
     });
-    return totalFaltas;
+    return total;
   }, [filteredEmployees, getRecord]);
+
+  const getEmployeeFaltas = useCallback((employeeId: string) => {
+    let total = 0;
+    daysInMonth.forEach(dayInfo => {
+      if (dayInfo.isSunday || dayInfo.isHoliday) return;
+      const record = getRecord(employeeId, dayInfo.day);
+      const code = record.supervisor || record.apontador;
+      if (OCORRENCIA_CODES.includes(code)) {
+        total++;
+      }
+    });
+    return total;
+  }, [daysInMonth, getRecord]);
 
   const generateExportData = useCallback(() => {
     const data: any[] = [];
@@ -598,6 +613,7 @@ export function useAttendance() {
     addJustification,
     removeJustification,
     getTotals,
+    getEmployeeFaltas,
     generateExportData,
     saveAll,
     refreshData,

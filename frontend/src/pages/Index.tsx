@@ -31,6 +31,7 @@ const Index = () => {
     addJustification,
     removeJustification,
     getTotals,
+    getEmployeeFaltas,
     saveAll,
     refreshData,
   } = useAttendance();
@@ -95,6 +96,14 @@ const Index = () => {
                 Central de Usuários
               </Link>
             )}
+            {user?.role === 'admin' && (
+              <Link
+                to="/admin/logs"
+                className="text-sm bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground px-3 py-1.5 rounded-lg transition-colors font-medium"
+              >
+                📋 Logs
+              </Link>
+            )}
             <div className="text-sm bg-primary-foreground/10 px-3 py-1.5 rounded-lg">
               <span className="text-primary-foreground/70">Usuário:</span>{' '}
               <span className="font-semibold">
@@ -130,6 +139,7 @@ const Index = () => {
           getRecord={getRecord}
           updateRecord={updateRecord}
           getTotals={getTotals}
+          getEmployeeFaltas={getEmployeeFaltas}
           currentUserRole={currentUserRole}
           supervisorName={currentSupervisor?.name}
           storeName={currentSupervisor?.store}

@@ -5,6 +5,7 @@ import { Justification } from '../models/Justification.js';
 import { User } from '../models/User.js';
 import { Employee } from '../models/Employee.js';
 import { MonthStatus } from '../models/MonthStatus.js';
+import { AuditLog } from '../models/AuditLog.js';
 import { Types } from 'mongoose';
 
 // simple slug helper
@@ -141,6 +142,29 @@ router.post('/', authenticateJWT, async (req: AuthRequest, res) => {
       { ordered: false }
     );
 
+    // Audit log: record attendance changes
+    try {
+      const userName = req.user?.name || req.user?.username || '';
+      const userRole = req.user?.role || '';
+      const auditEntries = ops.map((r) => ({
+        action: 'attendance_update' as const,
+        userId: new Types.ObjectId(String(req.userId)),
+        userName,
+        userRole,
+        targetType: 'attendance' as const,
+        description: `${userName} alterou presença de ${r.employeeName} em ${r.day}`,
+        details: {
+          employeeId: r.canonicalId,
+          employeeName: r.employeeName,
+          day: r.day,
+          apontador: r.apontador,
+          supervisor: r.supervisor,
+          supervisorId: r.supervisorId,
+        },
+      }));
+      AuditLog.insertMany(auditEntries).catch(() => {});
+    } catch (_) {}
+
     res.json({ ok: true, saved: ops.length });
   } catch (e) {
     console.error('Failed to save attendance:', e);
@@ -262,6 +286,8 @@ router.post('/justifications', authenticateJWT, async (req: AuthRequest, res) =>
     for (const j of justifications) {
       // Extract supervisorId from employeeId prefix (e.g., "mariana-moura-max" -> "mariana-moura")
       const supervisorIdFromEmployee = j.employeeId?.split('-').slice(0, -1).join('-') || null;
+      const existing = await Justification.findOne({ employeeId: j.employeeId, day: j.day }).lean();
+      const isUpdate = !!existing;
       const doc = await Justification.findOneAndUpdate(
         { employeeId: j.employeeId, day: j.day },
         {
@@ -274,6 +300,26 @@ router.post('/justifications', authenticateJWT, async (req: AuthRequest, res) =>
         { upsert: true, new: true }
       );
       if (doc) saved.push(doc);
+
+      // Audit log
+      try {
+        const userName = req.user?.name || req.user?.username || '';
+        const userRole = req.user?.role || '';
+        await AuditLog.create({
+          action: isUpdate ? 'justification_update' : 'justification_create',
+          userId: new Types.ObjectId(String(req.userId)),
+          userName,
+          userRole,
+          targetType: 'justification',
+          description: `${userName} ${isUpdate ? 'editou' : 'criou'} justificativa de ${j.employeeId} em ${j.day}`,
+          details: {
+            employeeId: j.employeeId,
+            day: j.day,
+            text: j.text,
+            previousText: existing?.text || null,
+          },
+        });
+      } catch (_) {}
     }
     res.json({ ok: true, saved });
   } catch (e) {
@@ -362,6 +408,27 @@ router.delete('/justifications', authenticateJWT, async (req: AuthRequest, res) 
 
     // Sempre deletar pelo _id real do target encontrado
     const deleted = await Justification.findByIdAndDelete(target._id);
+
+    // Audit log
+    if (deleted) {
+      try {
+        const userName = req.user?.name || req.user?.username || '';
+        const userRole = req.user?.role || '';
+        await AuditLog.create({
+          action: 'justification_delete',
+          userId: new Types.ObjectId(String(req.userId)),
+          userName,
+          userRole,
+          targetType: 'justification',
+          description: `${userName} deletou justificativa de ${target.employeeId} em ${target.day}`,
+          details: {
+            employeeId: target.employeeId,
+            day: target.day,
+            deletedText: target.text || '',
+          },
+        });
+      } catch (_) {}
+    }
 
     res.json({ ok: true, deleted: !!deleted });
   } catch (e) {

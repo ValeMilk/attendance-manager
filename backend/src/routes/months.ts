@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { authenticateJWT, AuthRequest, requireRole } from '../middleware/auth.js';
 import { MonthStatus } from '../models/MonthStatus.js';
+import { AuditLog } from '../models/AuditLog.js';
+import { Types } from 'mongoose';
 
 const router = Router();
 
@@ -131,6 +133,22 @@ router.post('/:month/unlock-period', authenticateJWT, requireRole(['admin']), as
     ]);
 
     console.log(`✅ Period unlocked: ${month1} + ${month2}`);
+
+    // Audit log
+    try {
+      const userName = req.user?.name || req.user?.username || '';
+      const userRole = req.user?.role || '';
+      await AuditLog.create({
+        action: 'period_unlock',
+        userId: new Types.ObjectId(String(req.userId)),
+        userName,
+        userRole,
+        targetType: 'period',
+        description: `${userName} desbloqueou o período ${month1} - ${month2}`,
+        details: { months: [month1, month2] },
+      });
+    } catch (_) {}
+
     res.json({ ok: true, months: [month1, month2] });
   } catch (e) {
     console.error('Failed to unlock period', e);
@@ -160,6 +178,22 @@ router.post('/:month/lock-period', authenticateJWT, requireRole(['admin']), asyn
     ]);
 
     console.log(`✅ Period locked: ${month1} + ${month2}`);
+
+    // Audit log
+    try {
+      const userName = req.user?.name || req.user?.username || '';
+      const userRole = req.user?.role || '';
+      await AuditLog.create({
+        action: 'period_lock',
+        userId: new Types.ObjectId(String(req.userId)),
+        userName,
+        userRole,
+        targetType: 'period',
+        description: `${userName} bloqueou o período ${month1} - ${month2}`,
+        details: { months: [month1, month2] },
+      });
+    } catch (_) {}
+
     res.json({ ok: true, months: [month1, month2] });
   } catch (e) {
     console.error('Failed to lock period', e);
