@@ -25,7 +25,7 @@ export function DataExport({
   const generateData = () => {
     const rows: Record<string, string>[] = [];
 
-    const WEEKDAY_ABBR_PT = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
+    const WEEKDAY_ABBR_PT = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
     const employeesToUse = selectedSupervisor === 'all' ? employees : employees.filter(e => (e as any).supervisorUserId === selectedSupervisor);
 
     daysInMonth.forEach(dayInfo => {
