@@ -282,10 +282,16 @@ router.post('/justifications', authenticateJWT, async (req: AuthRequest, res) =>
       }
     }
 
+    const knownSupervisorIds = (
+      await User.find({ role: 'supervisor' }).select('supervisorId').lean()
+    )
+      .map((u: any) => String(u?.supervisorId || '').trim())
+      .filter(Boolean);
+
     const saved: any[] = [];
     for (const j of justifications) {
-      // Extract supervisorId from employeeId prefix (e.g., "mariana-moura-max" -> "mariana-moura")
-      const supervisorIdFromEmployee = j.employeeId?.split('-').slice(0, -1).join('-') || null;
+      // Use proper supervisor inference instead of naive split
+      const supervisorIdFromEmployee = inferSupervisorIdFromEmployeeId(j.employeeId || '', knownSupervisorIds);
       const existing = await Justification.findOne({ employeeId: j.employeeId, day: j.day }).lean();
       const isUpdate = !!existing;
       const doc = await Justification.findOneAndUpdate(
