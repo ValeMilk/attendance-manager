@@ -1,14 +1,9 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const mongoose_1 = __importDefault(require("mongoose"));
+import mongoose from 'mongoose';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://miqueiascirino_db_user:valemilk123456789@dbvale.chv7pdf.mongodb.net/attendance-manager';
 async function main() {
-    await mongoose_1.default.connect(MONGO_URI);
+    await mongoose.connect(MONGO_URI);
     console.log('Connected to MongoDB');
-    const db = mongoose_1.default.connection.db;
+    const db = mongoose.connection.db;
     const usersCol = db.collection('users');
     const justCol = db.collection('justifications');
     // Get known supervisor IDs
@@ -41,6 +36,6 @@ async function main() {
         }
     }
     console.log(`Fixed ${fixed} justifications`);
-    await mongoose_1.default.disconnect();
+    await mongoose.disconnect();
 }
 main().catch(console.error);
