@@ -449,8 +449,7 @@ export function useAttendance() {
     let total = 0;
     filteredEmployees.forEach(emp => {
       const record = getRecord(emp.id, day);
-      const code = record.supervisor || record.apontador;
-      if (OCORRENCIA_CODES.includes(code)) {
+      if (OCORRENCIA_CODES.includes(record.apontador) || OCORRENCIA_CODES.includes(record.supervisor)) {
         total++;
       }
     });
@@ -462,8 +461,7 @@ export function useAttendance() {
     daysInMonth.forEach(dayInfo => {
       if (dayInfo.isSunday || dayInfo.isHoliday) return;
       const record = getRecord(employeeId, dayInfo.day);
-      const code = record.supervisor || record.apontador;
-      if (OCORRENCIA_CODES.includes(code)) {
+      if (OCORRENCIA_CODES.includes(record.apontador) || OCORRENCIA_CODES.includes(record.supervisor)) {
         total++;
       }
     });
