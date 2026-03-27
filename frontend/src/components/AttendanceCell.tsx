@@ -19,17 +19,22 @@ function getCellClass(value: AttendanceCode, dayInfo: DayInfo): string {
     case 'P':
       return 'cell-present';
     case 'F':
-    case 'FT':
-    case 'FM':
       return 'cell-absent';
+    case 'FT':
+      return 'cell-falta-tarde';
+    case 'FM':
+      return 'cell-falta-manha';
     case 'AT':
+      return 'cell-atestado';
     case 'ABF':
+      return 'cell-abono-falta';
     case 'ABT':
-      return 'cell-justified';
+      return 'cell-abono-trab';
     case 'FER':
-      return 'cell-holiday';
     case 'FERI':
       return 'cell-holiday';
+    case 'FOLGA':
+      return 'cell-folga';
     default:
       return '';
   }

@@ -39,10 +39,14 @@
     /* Status colors */
     --status-present: 145 70% 40%;
     --status-absent: 0 75% 55%;
-    --status-partial: 35 100% 50%;
-    --status-justified: 200 80% 50%;
+    --status-falta-tarde: 25 95% 50%;
+    --status-falta-manha: 45 100% 42%;
+    --status-atestado: 210 80% 55%;
+    --status-abono-falta: 175 70% 38%;
+    --status-abono-trab: 265 60% 58%;
     --status-sunday: 220 30% 75%;
     --status-holiday: 280 60% 65%;
+    --status-folga: 330 55% 55%;
 
     /* Table specific */
     --table-header: 220 70% 20%;
@@ -90,10 +94,14 @@
 
     --status-present: 145 60% 35%;
     --status-absent: 0 65% 45%;
-    --status-partial: 35 90% 45%;
-    --status-justified: 200 70% 45%;
+    --status-falta-tarde: 25 85% 45%;
+    --status-falta-manha: 45 90% 38%;
+    --status-atestado: 210 70% 50%;
+    --status-abono-falta: 175 60% 33%;
+    --status-abono-trab: 265 50% 52%;
     --status-sunday: 220 25% 35%;
     --status-holiday: 280 50% 50%;
+    --status-folga: 330 45% 48%;
 
     --table-header: 220 50% 18%;
     --table-header-foreground: 0 0% 100%;
@@ -130,12 +138,28 @@
     @apply bg-[hsl(var(--status-absent))] text-white font-semibold;
   }
   
-  .cell-partial {
-    @apply bg-[hsl(var(--status-partial))] text-white font-semibold;
+  .cell-falta-tarde {
+    @apply bg-[hsl(var(--status-falta-tarde))] text-white font-semibold;
   }
   
-  .cell-justified {
-    @apply bg-[hsl(var(--status-justified))] text-white font-semibold;
+  .cell-falta-manha {
+    @apply bg-[hsl(var(--status-falta-manha))] text-white font-semibold;
+  }
+  
+  .cell-atestado {
+    @apply bg-[hsl(var(--status-atestado))] text-white font-semibold;
+  }
+  
+  .cell-abono-falta {
+    @apply bg-[hsl(var(--status-abono-falta))] text-white font-semibold;
+  }
+  
+  .cell-abono-trab {
+    @apply bg-[hsl(var(--status-abono-trab))] text-white font-semibold;
+  }
+  
+  .cell-folga {
+    @apply bg-[hsl(var(--status-folga))] text-white font-semibold;
   }
   
   .cell-sunday {

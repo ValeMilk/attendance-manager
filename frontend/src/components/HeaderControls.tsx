@@ -55,7 +55,7 @@ export function HeaderControls({
   }
 
   const period = getPeriodRange(currentDate);
-  const WEEKDAY_ABBR_PT = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+  const WEEKDAY_ABBR_PT = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
   
   // Restrict navigation to 2026 only
   const canGoToPrevious = currentDate.getFullYear() > 2026 || (currentDate.getFullYear() === 2026 && currentDate.getMonth() > 0);
@@ -216,23 +216,23 @@ export function HeaderControls({
             <span>Falta</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-5 h-5 rounded cell-partial flex items-center justify-center text-[10px]">FT</span>
+            <span className="w-5 h-5 rounded cell-falta-tarde flex items-center justify-center text-[10px]">FT</span>
             <span>Falta Tarde</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-5 h-5 rounded cell-partial flex items-center justify-center text-[10px]">FM</span>
+            <span className="w-5 h-5 rounded cell-falta-manha flex items-center justify-center text-[10px]">FM</span>
             <span>Falta Manhã</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-5 h-5 rounded cell-justified flex items-center justify-center text-[10px]">AT</span>
+            <span className="w-5 h-5 rounded cell-atestado flex items-center justify-center text-[10px]">AT</span>
             <span>Atestado</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-5 h-5 rounded cell-justified flex items-center justify-center text-[10px]">ABF</span>
+            <span className="w-5 h-5 rounded cell-abono-falta flex items-center justify-center text-[10px]">ABF</span>
             <span>Abono Falta</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-5 h-5 rounded cell-justified flex items-center justify-center text-[10px]">ABT</span>
+            <span className="w-5 h-5 rounded cell-abono-trab flex items-center justify-center text-[10px]">ABT</span>
             <span>Abono Trab.</span>
           </div>
           <div className="flex items-center gap-1">
