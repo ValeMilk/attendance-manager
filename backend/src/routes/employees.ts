@@ -254,7 +254,7 @@ router.get('/', authenticateJWT, async (req: AuthRequest, res) => {
         const name = String(emp?.name || '').trim();
         if (!name) continue;
         const id = `${supId}-${slugify(name)}`;
-        rosterEmployees.push({ id, name: slugify(name), role: emp.role || '', supervisorId: supId, supervisorUserId: supUserId });
+        rosterEmployees.push({ id, name, role: emp.role || '', supervisorId: supId, supervisorUserId: supUserId });
       }
     }
 
