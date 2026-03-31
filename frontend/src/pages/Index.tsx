@@ -148,9 +148,12 @@ const Index = () => {
         />
 
         <JustificationsSection
-          justifications={justifications.filter(j => 
-            filteredEmployees.some(e => e.id === j.employeeId)
-          )}
+          justifications={justifications.filter(j => {
+            const belongsToEmployee = filteredEmployees.some(e => e.id === j.employeeId);
+            const hasText = j.text && j.text.trim().length > 0;
+            const inPeriod = daysInMonth.some(d => d.day === j.day);
+            return belongsToEmployee && hasText && inPeriod;
+          })}
           employees={filteredEmployees}
           daysInMonth={daysInMonth}
           onAdd={addJustification}
