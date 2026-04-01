@@ -6,7 +6,6 @@ import { HeaderControls } from '@/components/HeaderControls';
 import { Link } from 'react-router-dom';
 import { AttendanceTable } from '@/components/AttendanceTable';
 import { JustificationsSection } from '@/components/JustificationsSection';
-import { DataExport } from '@/components/DataExport';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useEffect, useMemo } from 'react';
@@ -121,6 +120,14 @@ const Index = () => {
                 Central de Usuários
               </Link>
             )}
+            {(user?.role === 'admin' || user?.role === 'gerente') && (
+              <Link
+                to="/exportacao"
+                className="text-sm bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground px-3 py-1.5 rounded-lg transition-colors font-medium"
+              >
+                📊 Exportação
+              </Link>
+            )}
             {user?.role === 'admin' && (
               <Link
                 to="/admin/logs"
@@ -182,16 +189,6 @@ const Index = () => {
           onRemove={removeJustification}
           currentUserRole={currentUserRole}
         />
-
-        {(currentUserRole === 'admin' || currentUserRole === 'gerente') && (
-          <DataExport
-            employees={filteredEmployees}
-            daysInMonth={daysInMonth}
-            getRecord={getRecord}
-            periodLabel={periodLabel}
-            supervisors={supervisors}
-          />
-        )}
 
         {/* If not authenticated, show login */}
       </main>

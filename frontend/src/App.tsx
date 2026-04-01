@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import { LoginPage } from "./pages/LoginPage";
 import AdminUsers from "./pages/AdminUsers";
 import AuditLogs from "./pages/AuditLogs";
+import ExportPage from "./pages/ExportPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <AuditLogs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exportacao"
+            element={
+              <ProtectedRoute>
+                <ExportPage />
               </ProtectedRoute>
             }
           />
