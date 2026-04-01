@@ -75,7 +75,8 @@ const Index = () => {
   // período vigente: 26 deste mês → 25 do próximo
   const periodStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 26);
   const periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 25);
-  const periodLabel = `${format(periodStart, 'MMMM yyyy', { locale: ptBR }).toUpperCase()} — ${format(periodEnd, 'MMMM yyyy', { locale: ptBR }).toUpperCase()}`;
+  // Referência de nome é sempre o dia 25 (data mais tardia)
+  const periodLabel = format(periodEnd, 'MMMM yyyy', { locale: ptBR }).toUpperCase();
 
   return (
     <div className="min-h-screen bg-background">

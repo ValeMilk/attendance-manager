@@ -39,7 +39,9 @@ export function HeaderControls({
 }: HeaderControlsProps) {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
-  const monthLabel = format(currentDate, 'MMMM yyyy', { locale: ptBR }).toUpperCase();
+  // Referência de nome é sempre o dia 25 (mês seguinte ao currentDate)
+  const periodEndDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 25);
+  const monthLabel = format(periodEndDate, 'MMMM yyyy', { locale: ptBR }).toUpperCase();
   const [showPeriodSidebar, setShowPeriodSidebar] = useState(false);
   const isRoleLocked = !!user;
 
