@@ -198,15 +198,22 @@ export function useAttendance() {
   }, [accessToken, employeesQueryString, refreshTick]);
 
   // Load persisted attendance + justifications when authenticated
+  // Send period bounds to avoid full collection scans
   useEffect(() => {
     let mounted = true;
     (async () => {
       if (!accessToken) return;
       if (hasUnsavedChanges) return;
       try {
-        const attRes = await fetch('/api/attendance', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const periodParams = periodStart && periodEnd ? `?startDay=${periodStart}&endDay=${periodEnd}` : '';
+        const [attRes, justRes] = await Promise.all([
+          fetch(`/api/attendance${periodParams}`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }),
+          fetch('/api/attendance/justifications', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }),
+        ]);
         if (attRes.ok) {
           const att = await attRes.json();
           if (!mounted) return;
@@ -215,9 +222,6 @@ export function useAttendance() {
           setHasUnsavedChanges(false);
         }
 
-        const justRes = await fetch('/api/attendance/justifications', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
         if (justRes.ok) {
           const js = await justRes.json();
           if (!mounted) return;
@@ -228,7 +232,7 @@ export function useAttendance() {
       }
     })();
     return () => { mounted = false; };
-  }, [accessToken, refreshTick, hasUnsavedChanges]);
+  }, [accessToken, refreshTick, hasUnsavedChanges, periodStart, periodEnd]);
 
   // Auto-refresh for non-admin users so status updates from admin appear without full page reload.
   useEffect(() => {
@@ -237,7 +241,7 @@ export function useAttendance() {
     if (hasUnsavedChanges) return;
     const timer = setInterval(() => {
       setRefreshTick((value) => value + 1);
-    }, 10000);
+    }, 30000);
     return () => clearInterval(timer);
   }, [accessToken, currentUserRole, hasUnsavedChanges]);
 
@@ -262,19 +266,24 @@ export function useAttendance() {
     setHasUnsavedChanges(true);
     setRecords(prev => {
       const JUST_CODES_TO_PREFILL: AttendanceCode[] = ['AT', 'ABF', 'ABT'];
-      const index = prev.findIndex(r => r.employeeId === employeeId && r.day === day);
-      if (index >= 0) {
+      // Use a map lookup for O(1) instead of findIndex O(N)
+      const existingIndex = new Map<string, number>();
+      for (let i = 0; i < prev.length; i++) {
+        existingIndex.set(makeRecordKey(prev[i].employeeId, prev[i].day), i);
+      }
+      const idx = existingIndex.get(key);
+      if (idx !== undefined) {
         const updated = [...prev];
-        const existing = updated[index];
+        const existing = updated[idx];
         // se o apontador mudou, sincroniza no supervisor salvo, exceto quando o supervisor
         // já tem uma justificativa de abono (AT/ABF/ABT) — nesses casos não sobrescreve.
         if (field === 'apontador') {
           const supervisorVal = JUST_CODES_TO_PREFILL.includes(existing.supervisor as AttendanceCode)
             ? existing.supervisor
             : value;
-          updated[index] = { ...existing, apontador: value, supervisor: supervisorVal };
+          updated[idx] = { ...existing, apontador: value, supervisor: supervisorVal };
         } else {
-          updated[index] = { ...existing, [field]: value };
+          updated[idx] = { ...existing, [field]: value };
         }
         return updated;
       }
@@ -304,6 +313,45 @@ export function useAttendance() {
       });
     }
   }, [employeesState, daysInMonth]);
+
+  // Batch update multiple records in a single setState call (avoids N re-renders)
+  const updateRecordsBatch = useCallback((
+    updates: Array<{ employeeId: string; day: string; field: 'apontador' | 'supervisor'; value: AttendanceCode }>
+  ) => {
+    if (updates.length === 0) return;
+    setHasUnsavedChanges(true);
+    setDirtyRecordKeys(prev => {
+      const next = new Set(prev);
+      for (const u of updates) next.add(makeRecordKey(u.employeeId, u.day));
+      return next;
+    });
+    setRecords(prev => {
+      const map = new Map<string, AttendanceRecord>();
+      for (const r of prev) map.set(makeRecordKey(r.employeeId, r.day), r);
+      const JUST_CODES: AttendanceCode[] = ['AT', 'ABF', 'ABT'];
+      for (const u of updates) {
+        const key = makeRecordKey(u.employeeId, u.day);
+        const existing = map.get(key);
+        if (existing) {
+          if (u.field === 'apontador') {
+            const supervisorVal = JUST_CODES.includes(existing.supervisor as AttendanceCode)
+              ? existing.supervisor
+              : u.value;
+            map.set(key, { ...existing, apontador: u.value, supervisor: supervisorVal });
+          } else {
+            map.set(key, { ...existing, [u.field]: u.value });
+          }
+        } else {
+          if (u.field === 'apontador') {
+            map.set(key, { employeeId: u.employeeId, day: u.day, apontador: u.value, supervisor: u.value });
+          } else {
+            map.set(key, { employeeId: u.employeeId, day: u.day, apontador: '', supervisor: u.value });
+          }
+        }
+      }
+      return Array.from(map.values());
+    });
+  }, []);
 
   const clearAll = useCallback(() => {
     setHasUnsavedChanges(true);
@@ -540,42 +588,25 @@ export function useAttendance() {
       }
 
       // Refresh local state from backend so UI reflects canonical saved data
+      // Use Promise.all to parallelize the 2 refresh GETs
       try {
-        const attRes = await fetch('/api/attendance', {
-          headers: { Authorization: accessToken ? `Bearer ${accessToken}` : '' },
-        });
+        const [attRes, justRes] = await Promise.all([
+          fetch('/api/attendance', {
+            headers: { Authorization: accessToken ? `Bearer ${accessToken}` : '' },
+          }),
+          fetch('/api/attendance/justifications', {
+            headers: { Authorization: accessToken ? `Bearer ${accessToken}` : '' },
+          }),
+        ]);
+
         if (attRes.ok) {
           const att = await attRes.json();
           setRecords(att.map((r: any) => ({ employeeId: r.employeeId, day: r.day, apontador: r.apontador, supervisor: r.supervisor })));
         }
 
-        const justRes = await fetch('/api/attendance/justifications', {
-          headers: { Authorization: accessToken ? `Bearer ${accessToken}` : '' },
-        });
         if (justRes.ok) {
           const js = await justRes.json();
           setJustifications(js.map((j: any) => ({ id: j._id || `just-${Date.now()}`, employeeId: j.employeeId, day: j.day, text: j.text })));
-        }
-        // Re-fetch canonical employees so UI uses current server-side list
-        try {
-          const empRes = await fetch(`/api/employees${employeesQueryString}`, {
-            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-          });
-          if (empRes.ok) {
-            const data = await empRes.json();
-            // Phase 3: Support both old array format and new paginated { employees, total, page, limit } format
-            const emps = Array.isArray(data) ? data : (data?.employees || []);
-            const mapped = (Array.isArray(emps) ? emps : []).map((e: any) => ({
-              id: e.id || `${e.supervisorId}-${e.slug}`,
-              name: e.name || e.displayName || e.slug,
-              role: e.role || 'FUNCIONÁRIO',
-              supervisorId: e.supervisorId,
-              supervisorUserId: e.supervisorUserId || (selectedSupervisor !== 'all' ? String(selectedSupervisor) : ''),
-            }));
-            setEmployeesState(dedupeById(mapped));
-          }
-        } catch (e) {
-          // ignore employee refresh errors
         }
       } catch (e) {
         // ignore refresh errors but keep save success
@@ -590,7 +621,7 @@ export function useAttendance() {
       console.error('Failed to save attendance', e);
       return false;
     }
-  }, [records, justifications, accessToken, employeesQueryString, dirtyRecordKeys, employeesById]);
+  }, [records, justifications, accessToken, dirtyRecordKeys, employeesById]);
 
   return {
     currentDate,
@@ -607,6 +638,7 @@ export function useAttendance() {
     supervisors: supervisorsState,
     getRecord,
     updateRecord,
+    updateRecordsBatch,
     clearAll,
     addJustification,
     removeJustification,

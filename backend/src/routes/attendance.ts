@@ -288,45 +288,50 @@ router.post('/justifications', authenticateJWT, async (req: AuthRequest, res) =>
       .map((u: any) => String(u?.supervisorId || '').trim())
       .filter(Boolean);
 
-    const saved: any[] = [];
-    for (const j of justifications) {
-      // Use proper supervisor inference instead of naive split
+    // Use bulkWrite instead of sequential findOneAndUpdate for O(1) round trips
+    const bulkOps = justifications.map((j: any) => {
       const supervisorIdFromEmployee = inferSupervisorIdFromEmployeeId(j.employeeId || '', knownSupervisorIds);
-      const existing = await Justification.findOne({ employeeId: j.employeeId, day: j.day }).lean();
-      const isUpdate = !!existing;
-      const doc = await Justification.findOneAndUpdate(
-        { employeeId: j.employeeId, day: j.day },
-        {
-          $set: {
-            text: j.text,
-            createdBy: req.userId,
-            supervisorId: supervisorIdFromEmployee, // Denormalize supervisorId for fast queries
+      return {
+        updateOne: {
+          filter: { employeeId: j.employeeId, day: j.day },
+          update: {
+            $set: {
+              text: j.text,
+              createdBy: req.userId ? new Types.ObjectId(String(req.userId)) : null,
+              supervisorId: supervisorIdFromEmployee,
+            },
           },
+          upsert: true,
         },
-        { upsert: true, new: true }
-      );
-      if (doc) saved.push(doc);
+      };
+    });
 
-      // Audit log
-      try {
-        const userName = req.user?.name || req.user?.username || '';
-        const userRole = req.user?.role || '';
-        await AuditLog.create({
-          action: isUpdate ? 'justification_update' : 'justification_create',
-          userId: new Types.ObjectId(String(req.userId)),
-          userName,
-          userRole,
-          targetType: 'justification',
-          description: `${userName} ${isUpdate ? 'editou' : 'criou'} justificativa de ${j.employeeId} em ${j.day}`,
-          details: {
-            employeeId: j.employeeId,
-            day: j.day,
-            text: j.text,
-            previousText: existing?.text || null,
-          },
-        });
-      } catch (_) {}
-    }
+    await Justification.bulkWrite(bulkOps, { ordered: false });
+
+    // Fetch the saved documents for the response
+    const filters = justifications.map((j: any) => ({ employeeId: j.employeeId, day: j.day }));
+    const saved = await Justification.find({ $or: filters }).lean();
+
+    // Audit log (fire and forget)
+    try {
+      const userName = req.user?.name || req.user?.username || '';
+      const userRole = req.user?.role || '';
+      const auditEntries = justifications.map((j: any) => ({
+        action: 'justification_update' as const,
+        userId: new Types.ObjectId(String(req.userId)),
+        userName,
+        userRole,
+        targetType: 'justification' as const,
+        description: `${userName} salvou justificativa de ${j.employeeId} em ${j.day}`,
+        details: {
+          employeeId: j.employeeId,
+          day: j.day,
+          text: j.text,
+        },
+      }));
+      AuditLog.insertMany(auditEntries).catch(() => {});
+    } catch (_) {}
+
     res.json({ ok: true, saved });
   } catch (e) {
     console.error('Failed to save justifications', e);

@@ -1,13 +1,16 @@
+import { memo } from 'react';
 import { AttendanceCode, APONTADOR_CODES, SUPERVISOR_CODES, DayInfo } from '@/types/attendance';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 interface AttendanceCellProps {
   dayInfo: DayInfo;
+  employeeId: string;
+  employeeName: string;
   apontadorValue: AttendanceCode;
   supervisorValue: AttendanceCode;
-  onApontadorChange: (value: AttendanceCode) => void;
-  onSupervisorChange: (value: AttendanceCode) => void;
+  onApontadorChange: (employeeId: string, day: string, value: AttendanceCode) => void;
+  onSupervisorChange: (employeeId: string, day: string, value: AttendanceCode, employeeName: string) => void;
   currentUserRole: 'admin' | 'gerente' | 'supervisor' | 'expectador';
   isDisabled?: boolean;
 }
@@ -40,8 +43,10 @@ function getCellClass(value: AttendanceCode, dayInfo: DayInfo): string {
   }
 }
 
-export function AttendanceCell({
+export const AttendanceCell = memo(function AttendanceCell({
   dayInfo,
+  employeeId,
+  employeeName,
   apontadorValue,
   supervisorValue,
   onApontadorChange,
@@ -89,7 +94,7 @@ export function AttendanceCell({
         {apontadorEditable ? (
           <Select
             value={apontadorValue || 'empty'}
-            onValueChange={(v) => onApontadorChange(v === 'empty' ? '' : v as AttendanceCode)}
+            onValueChange={(v) => onApontadorChange(employeeId, dayInfo.day, v === 'empty' ? '' : v as AttendanceCode)}
           >
             <SelectTrigger className="h-5 w-full border-0 bg-transparent text-[10px] font-semibold p-0 justify-center focus:ring-0">
               <SelectValue placeholder="-" />
@@ -115,7 +120,7 @@ export function AttendanceCell({
       )}>
         <Select
           value={supervisorValue || 'empty'}
-          onValueChange={(v) => onSupervisorChange(v === 'empty' ? '' : v as AttendanceCode)}
+          onValueChange={(v) => onSupervisorChange(employeeId, dayInfo.day, v === 'empty' ? '' : v as AttendanceCode, employeeName)}
           disabled={!supervisorEditable}
         >
           <SelectTrigger className="h-5 w-full border-0 bg-transparent text-[10px] font-semibold p-0 justify-center focus:ring-0 disabled:opacity-50">
@@ -131,4 +136,4 @@ export function AttendanceCell({
       </div>
     </div>
   );
-}
+});

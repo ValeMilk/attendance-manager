@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { Employee, DayInfo, AttendanceRecord, AttendanceCode } from '@/types/attendance';
 import { AttendanceCell } from './AttendanceCell';
@@ -9,6 +9,7 @@ interface AttendanceTableProps {
   daysInMonth: DayInfo[];
   getRecord: (employeeId: string, day: string) => AttendanceRecord;
   updateRecord: (employeeId: string, day: string, field: 'apontador' | 'supervisor', value: AttendanceCode) => void;
+  updateRecordsBatch?: (updates: Array<{ employeeId: string; day: string; field: 'apontador' | 'supervisor'; value: AttendanceCode }>) => void;
   addJustification?: (employeeId: string, day: string, text: string, applyToSupervisor?: boolean, supervisorCode?: AttendanceCode) => void;
   getTotals: (day: string) => number;
   currentUserRole: 'admin' | 'gerente' | 'supervisor' | 'expectador';
@@ -31,6 +32,7 @@ export function AttendanceTable({
   daysInMonth,
   getRecord,
   updateRecord,
+  updateRecordsBatch,
   addJustification,
   getTotals,
   currentUserRole,
@@ -87,9 +89,8 @@ export function AttendanceTable({
     if (!dayInfo) return;
     // Não marcar domingos
     if (dayInfo.isSunday) return;
-    for (const emp of employees) {
-      updateRecord(emp.id, day, 'apontador', 'P');
-    }
+    const batch = updateRecordsBatch || ((updates: any[]) => updates.forEach(u => updateRecord(u.employeeId, u.day, u.field, u.value)));
+    batch(employees.map(emp => ({ employeeId: emp.id, day, field: 'apontador' as const, value: 'P' as AttendanceCode })));
   }
 
   function applyCodeToAll(day: string, code: string) {
@@ -98,22 +99,23 @@ export function AttendanceTable({
     if (!dayInfo) return;
     if (dayInfo.isSunday) return;
 
+    const batch = updateRecordsBatch || ((updates: any[]) => updates.forEach(u => updateRecord(u.employeeId, u.day, u.field, u.value)));
+    const updates: Array<{ employeeId: string; day: string; field: 'apontador' | 'supervisor'; value: AttendanceCode }> = [];
     for (const emp of employees) {
       if (!code) {
-        // clear to empty (interpreted as FOLGA by export if both blank)
-        updateRecord(emp.id, day, 'apontador', '');
-        updateRecord(emp.id, day, 'supervisor', '');
+        updates.push({ employeeId: emp.id, day, field: 'apontador', value: '' });
+        updates.push({ employeeId: emp.id, day, field: 'supervisor', value: '' });
       } else if (code === 'FER') {
-        updateRecord(emp.id, day, 'apontador', 'FER');
-        updateRecord(emp.id, day, 'supervisor', 'FER');
+        updates.push({ employeeId: emp.id, day, field: 'apontador', value: 'FER' });
+        updates.push({ employeeId: emp.id, day, field: 'supervisor', value: 'FER' });
       } else if (code === 'FOLGA') {
-        updateRecord(emp.id, day, 'apontador', 'FOLGA');
-        updateRecord(emp.id, day, 'supervisor', 'FOLGA');
+        updates.push({ employeeId: emp.id, day, field: 'apontador', value: 'FOLGA' });
+        updates.push({ employeeId: emp.id, day, field: 'supervisor', value: 'FOLGA' });
       } else {
-        // default: apply to apontador and let sync handle supervisor
-        updateRecord(emp.id, day, 'apontador', code as AttendanceCode);
+        updates.push({ employeeId: emp.id, day, field: 'apontador', value: code as AttendanceCode });
       }
     }
+    batch(updates);
   }
   function setAllHolidayForDay(day: string) {
     if (!isAdmin) return; // somente admin
@@ -121,12 +123,23 @@ export function AttendanceTable({
     if (!dayInfo) return;
     // não aplicamos feriado automático em domingos
     if (dayInfo.isSunday) return;
+    const batch = updateRecordsBatch || ((updates: any[]) => updates.forEach(u => updateRecord(u.employeeId, u.day, u.field, u.value)));
+    const updates: Array<{ employeeId: string; day: string; field: 'apontador' | 'supervisor'; value: AttendanceCode }> = [];
     for (const emp of employees) {
-      // marcar FER tanto em apontador quanto em supervisor
-      updateRecord(emp.id, day, 'apontador', 'FER');
-      updateRecord(emp.id, day, 'supervisor', 'FER');
+      updates.push({ employeeId: emp.id, day, field: 'apontador', value: 'FER' });
+      updates.push({ employeeId: emp.id, day, field: 'supervisor', value: 'FER' });
     }
+    batch(updates);
   }
+
+  // Stable callback creators to avoid inline arrow re-creations
+  const handleApontadorChangeCell = useCallback((employeeId: string, day: string, value: AttendanceCode) => {
+    updateRecord(employeeId, day, 'apontador', value);
+  }, [updateRecord]);
+
+  const handleSupervisorChangeCell = useCallback((employeeId: string, day: string, value: AttendanceCode, employeeName: string) => {
+    handleSupervisorChange(employeeId, day, value, employeeName);
+  }, []);
 
   return (
     <div style={{ overflowX: 'auto', width: '100%' }}>
@@ -292,10 +305,12 @@ export function AttendanceTable({
                         <td key={dayInfo.day} className="border-r border-border/30 p-0 w-[28px] h-[44px]">
                           <AttendanceCell
                             dayInfo={dayInfo}
+                            employeeId={employee.id}
+                            employeeName={employee.name}
                             apontadorValue={record.apontador}
                             supervisorValue={record.supervisor}
-                            onApontadorChange={(value) => updateRecord(employee.id, dayInfo.day, 'apontador', value)}
-                            onSupervisorChange={(value) => handleSupervisorChange(employee.id, dayInfo.day, value, employee.name)}
+                            onApontadorChange={handleApontadorChangeCell}
+                            onSupervisorChange={handleSupervisorChangeCell}
                             currentUserRole={currentUserRole}
                             isDisabled={isEditDisabled}
                           />
