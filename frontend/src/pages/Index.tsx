@@ -6,6 +6,7 @@ import { HeaderControls } from '@/components/HeaderControls';
 import { Link } from 'react-router-dom';
 import { AttendanceTable } from '@/components/AttendanceTable';
 import { JustificationsSection } from '@/components/JustificationsSection';
+import { AtestadosSection } from '@/components/AtestadosSection';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useEffect, useMemo } from 'react';
@@ -188,6 +189,11 @@ const Index = () => {
           onAdd={addJustification}
           onRemove={removeJustification}
           currentUserRole={currentUserRole}
+        />
+
+        <AtestadosSection
+          justifications={filteredJustifications}
+          employees={filteredEmployees}
         />
 
         {/* If not authenticated, show login */}
